@@ -8,11 +8,9 @@ import cv2
 import numpy as np
 import torch
 import torch.nn as nn
-
 from torchvision import transforms
 from torch.utils.data.dataloader import DataLoader
 from utils import SmoothCrossEntropyLoss
-
 from utils import draw_shadow
 from utils import shadow_edge_blur
 from utils import judge_mask_type
@@ -166,7 +164,8 @@ def gen_extra_data(
 
 
 def weights_init(m):
-    """Initializes the weights of [m] with a normal distribution with mean 0 and std=0.05"""
+    """Initializes the weights of [m] with a normal distribution with mean 0 and
+    std=0.05"""
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         nn.init.trunc_normal_(m.weight, std=0.05)
         nn.init.constant_(m.bias, 0.05)
@@ -195,7 +194,7 @@ def model_epoch(training_model, data_loader, train=False, optimizer=None):
 def training(
     training_model, train_loader, train_set, test_loader, test_set, adv_train=False
 ):
-
+    """Does the training for all epochs."""
     num_epoch, batch_size = 25, 64
     optimizer = torch.optim.Adam(
         training_model.parameters(), lr=0.001, weight_decay=1e-5
@@ -210,7 +209,6 @@ def training(
             else non_adversarial(train_loader)
         )
 
-        # # TODO: build the train and test sets
         # train_set = TrafficSignDataset(extra_train, extra_labels)
         # test_set = TrafficSignDataset(test_data, test_labels)
         # train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
