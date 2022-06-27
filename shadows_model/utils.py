@@ -14,7 +14,6 @@ from itertools import permutations
 
 
 def load_lisa(database_path):
-
     train_path = os.path.join(database_path, "train")
     test_path = os.path.join(database_path, "test")
     train_img_paths = os.listdir(train_path)
