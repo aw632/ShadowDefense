@@ -16,6 +16,8 @@ from utils import load_mask
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+loss_fun = SmoothCrossEntropyLoss(smoothing=0.1)
+
 # BEGIN NEURAL NETWORK
 class GtsrbCNN(nn.Module):
     def __init__(self):
@@ -53,7 +55,7 @@ class GtsrbCNN(nn.Module):
             nn.ReLU(),
             nn.Dropout(p=0.5),
         )
-        self.fc3 = nn.Linear(1024, n_class, bias=True)
+        self.fc3 = nn.Linear(1024, 43, bias=True)
 
     def forward(self, x):
         x = self.color_map(x)
@@ -71,8 +73,6 @@ class GtsrbCNN(nn.Module):
         out = self.fc3(out)
         return out
 
-
-# END NEURAL NETWORK
 
 # BEGIN HELPER FUNCTIONS
 def pre_process_image(image):
@@ -124,3 +124,38 @@ def transform_image(image, ang_range, shear_range, trans_range, preprocess):
     image = pre_process_image(image) if preprocess else image
 
     return image
+
+
+def gen_extra_data(
+    x_train,
+    y_train,
+    n_each,
+    ang_range,
+    shear_range,
+    trans_range,
+    randomize_var,
+    preprocess=True,
+):
+    """Transforms each of the [x_train] training images [n_each] times, and outputs
+    the transformed images with labels.
+    """
+    x_arr, y_arr = [], []
+    n_train = len(x_train)
+    for i in range(n_train):
+        for i_n in range(n_each):
+            img_trf = transform_image(
+                x_train[i], ang_range, shear_range, trans_range, preprocess
+            )
+            x_arr.append(img_trf)
+            y_arr.append(y_train[i])
+
+    x_arr = np.array(x_arr, dtype=np.float32())
+    y_arr = np.array(y_arr, dtype=np.float32())
+
+    if randomize_var == 1:
+        len_arr = np.arange(len(y_arr))
+        np.random.shuffle(len_arr)
+        x_arr[len_arr] = x_arr
+        y_arr[len_arr] = y_arr
+
+    return x_arr, y_arr
