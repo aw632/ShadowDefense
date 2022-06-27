@@ -3,9 +3,16 @@ import torch
 import torch.nn as nn
 from torchvision import transforms
 from torch.utils.data.dataloader import DataLoader
+from utils import SmoothCrossEntropyLoss
+from utils import draw_shadow
+from utils import shadow_edge_blur
+from utils import judge_mask_type
+from utils import load_mask
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class Net(nn.Module):
+# BEGIN NEURAL NETWORK
+class GtsrbCNN(nn.Module):
     def __init__(self):
         super().__init__()
         self.color_map = nn.Conv2d(3, 3, (1, 1), stride=(1, 1), padding=0)
@@ -44,4 +51,71 @@ class Net(nn.Module):
         self.fc3 = nn.Linear(1024, n_class, bias=True)
 
     def forward(self, x):
-        raise NotImplementedError
+        x = self.color_map(x)
+        branch1 = self.module1(x)
+        branch2 = self.module2(branch1)
+        branch3 = self.module3(branch2)
+
+        branch1 = branch1.reshape(branch1.shape[0], -1)
+        branch2 = branch2.reshape(branch2.shape[0], -1)
+        branch3 = branch3.reshape(branch3.shape[0], -1)
+        concat = torch.cat([branch1, branch2, branch3], 1)
+
+        out = self.fc1(concat)
+        out = self.fc2(out)
+        out = self.fc3(out)
+        return out
+
+
+# END NEURAL NETWORK
+
+# BEGIN HELPER FUNCTIONS
+def pre_process_image(image):
+    """Normalizes [image] to 0-1 range with standard Gaussian distribution.
+
+    Args:
+        image (C x H x W tensor): a 3D tensor representing image.
+
+    Returns:
+        C x H x W tensor: the normalized image
+    """
+    image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
+    image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
+    image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
+    image = image / 255.0 - 0.5
+    return image
+
+
+def transform_image(image, ang_range, shear_range, trans_range, preprocess):
+    """Applies set of transformations to [image].
+
+    Returns:
+        C x H x W tensor: the transformed image
+    """
+    # Rotation
+    ang_rot = np.random.uniform(ang_range) - ang_range / 2
+    rows, cols, ch = image.shape
+    rot_m = cv2.getRotationMatrix2D((cols / 2, rows / 2), ang_rot, 1)
+
+    # Translation
+    tr_x = trans_range * np.random.uniform() - trans_range / 2
+    tr_y = trans_range * np.random.uniform() - trans_range / 2
+    trans_m = np.float32([[1, 0, tr_x], [0, 1, tr_y]])
+
+    # Shear
+    pts1 = np.float32([[5, 5], [20, 5], [5, 20]])
+
+    pt1 = 5 + shear_range * np.random.uniform() - shear_range / 2
+    pt2 = 20 + shear_range * np.random.uniform() - shear_range / 2
+
+    pts2 = np.float32([[pt1, 5], [pt2, pt1], [5, pt2]])
+
+    shear_m = cv2.getAffineTransform(pts1, pts2)
+
+    image = cv2.warpAffine(image, rot_m, (cols, rows))
+    image = cv2.warpAffine(image, trans_m, (cols, rows))
+    image = cv2.warpAffine(image, shear_m, (cols, rows))
+
+    image = pre_process_image(image) if preprocess else image
+
+    return image
