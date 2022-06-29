@@ -203,7 +203,7 @@ def training(
     )
 
     for epoch in range(num_epoch):
-
+        print(epoch)
         extra_train, extra_labels = (
             adversarial_augmentation(train_data, train_labels)
             if adv_train
@@ -277,7 +277,7 @@ def train_model(adv_train=False):
     with open("./dataset/GTSRB/test.pkl", "rb") as f:
         test = pickle.load(f)
         test_data, test_labels = test["data"], test["labels"]
-
+    print("data loaded!")
     processed_train = (
         np.array(
             [pre_process_image(train_data[i]) for i in range(len(train_data))],
@@ -298,6 +298,7 @@ def train_model(adv_train=False):
     label_train = np.concatenate([train_labels, augment_data_labels], 0)
     image_test, label_test = processed_test, test_labels
 
+    print("I'm training now!")
     training_model = GtsrbCNN(n_class=class_n).to(device).apply(weights_init)
     training(training_model, image_train, label_train, image_test, label_test)
 
