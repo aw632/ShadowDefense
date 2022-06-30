@@ -9,9 +9,9 @@ import argparse
 import numpy as np
 from pso import PSO
 import gtsrb
-import lisa
+# import lisa
 from gtsrb import GtsrbCNN
-from lisa import LisaCNN
+# from lisa import LisaCNN
 from utils import brightness
 from utils import shadow_edge_blur
 from utils import judge_mask_type
@@ -89,14 +89,15 @@ n_try = args.n_try
 
 assert attack_db in ["LISA", "GTSRB"]
 if attack_db == "LISA":
-    model = LisaCNN(n_class=class_n_lisa).to(device)
-    model.load_state_dict(
-        torch.load(
-            f'./model/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
-            map_location=torch.device(device),
-        )
-    )
-    pre_process = transforms.Compose([transforms.ToTensor()])
+    # model = LisaCNN(n_class=class_n_lisa).to(device)
+    # model.load_state_dict(
+    #     torch.load(
+    #         f'./model/{"adv_" if target_model == "robust" else ""}model_lisa.pth',
+    #         map_location=torch.device(device),
+    #     )
+    # )
+    # pre_process = transforms.Compose([transforms.ToTensor()])
+    print("Lisa is commented out")
 else:
     model = GtsrbCNN(n_class=class_n_gtsrb).to(device)
     model.load_state_dict(
@@ -240,9 +241,10 @@ def attack_physical():
 
     cv2.imwrite("./tmp/temp.bmp", adv_img)
     if attack_db == "LISA":
-        predict, failed = lisa.test_single_image(
-            "./tmp/temp.bmp", image_label, target_model == "robust"
-        )
+        # predict, failed = lisa.test_single_image(
+        #     "./tmp/temp.bmp", image_label, target_model == "robust"
+        # )
+        print("Lisa is commented out")
     else:
         predict, failed = gtsrb.test_single_image(
             "./tmp/temp.bmp", image_label, target_model == "robust"
@@ -263,9 +265,10 @@ def attack_physical():
 
     cv2.imwrite("./tmp/adv_img.png", adv_img)
     if attack_db == "LISA":
-        predict, failed = lisa.test_single_image(
-            "./tmp/adv_img.png", image_label, target_model == "robust"
-        )
+        # predict, failed = lisa.test_single_image(
+        #     "./tmp/adv_img.png", image_label, target_model == "robust"
+        # )
+        print("LISA is commented out")
     else:
         predict, failed = gtsrb.test_single_image(
             "./tmp/adv_img.png", image_label, target_model == "robust"
