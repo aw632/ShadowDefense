@@ -3,6 +3,6 @@
   "python.linting.enabled": true,
   "python.linting.pylintEnabled": false,
   "python.linting.flake8Args": [
-    "--ignore=E402,F841,F401,E302,E305,E302,E501,E203",
+    "--ignore=E402,F841,F401,E302,E305,E302,E501,E203,W503",
 ],
 }
