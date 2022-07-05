@@ -362,10 +362,10 @@ def test_single_image(img_path, label, adv_model=False):
 if __name__ == "__main__":
 
     # model training
-    train_model(adv_train=True)
+    # train_model(adv_train=True)
 
-    # model testing
-    test_model(adv_model=True)
+    # # model testing
+    # test_model(adv_model=True)
 
     # test a single image
-    # test_single_image("./tmp/adv_img.png", 1, adv_model=False)
+    test_single_image("./test/edge_gtsrb_30.png", 1, adv_model=False)
