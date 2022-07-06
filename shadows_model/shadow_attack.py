@@ -159,7 +159,7 @@ def attack(
 
         if succeed:
             break
-        
+
         if not testing:
             print(f"try {attempt + 1}:", end=" ")
 
