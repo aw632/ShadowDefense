@@ -9,8 +9,10 @@ import argparse
 import numpy as np
 from pso import PSO
 import gtsrb
+
 # import lisa
 from gtsrb import GtsrbCNN
+
 # from lisa import LisaCNN
 from utils import brightness
 from utils import shadow_edge_blur
@@ -130,6 +132,7 @@ def attack(
     coords,
     targeted_attack=False,
     physical_attack=False,
+    testing=False,
     **parameters,
 ):
     r"""
@@ -182,7 +185,10 @@ def attack(
 
         if targeted_attack:
             best_solution = 1 - best_solution
-        print(f"Best solution: {best_solution} {'succeed' if succeed else 'failed'}")
+        if not testing:
+            print(
+                f"Best solution: {best_solution} {'succeed' if succeed else 'failed'}"
+            )
         if best_solution < global_best_solution:
             global_best_solution = best_solution
             global_best_position = best_pos
@@ -196,7 +202,7 @@ def attack(
     return adv_image, succeed, num_query
 
 
-def attack_digital():
+def attack_digital(testing=False):
 
     save_dir = f"./adv_img/{attack_db}/{int(shadow_level*100)}"
     try:
@@ -205,7 +211,7 @@ def attack_digital():
         for name in os.listdir(save_dir):
             os.remove(os.path.join(save_dir, name))
 
-    with open(f"./dataset/{attack_db}/test.pkl", "rb") as dataset:
+    with open("./dataset/GTSRB/test.pkl", "rb") as dataset:
         test_data = pickle.load(dataset)
         images, labels = test_data["data"], test_data["labels"]
 
@@ -216,7 +222,8 @@ def attack_digital():
                 images[index], labels[index], position_list[mask_type]
             )
             cv2.imwrite(
-                f"{save_dir}/{index}_{labels[index]}_{num_query}_{success}.bmp", adv_img
+                f"{save_dir}/{index}_{labels[index]}_{num_query}_{success}.bmp",
+                adv_img,
             )
 
     print("Attack finished! Success rate: ", end="")
