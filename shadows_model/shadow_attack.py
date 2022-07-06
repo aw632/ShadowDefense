@@ -159,8 +159,9 @@ def attack(
 
         if succeed:
             break
-
-        print(f"try {attempt + 1}:", end=" ")
+        
+        if not testing:
+            print(f"try {attempt + 1}:", end=" ")
 
         pso = PSO(
             polygon * 2,

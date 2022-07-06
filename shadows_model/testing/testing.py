@@ -55,6 +55,7 @@ def regime_one(out_file):
                 f"{INPUT_DIR}/{index}_{labels[index]}_{success}.png",
                 adv_img,
             )
+            print("Image {} saved!".format(index))
     print("******** Finished Generating Adversarial Images. *****")
     # push the images through the edge profiler
     dataset_val = TestDataset(
