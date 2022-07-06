@@ -12,10 +12,15 @@ import DexiNed.main
 from DexiNed.model import DexiNed
 from DexiNed.datasets import TestDataset
 import json
+from tqdm import tqdm
 import cv2
 
 # BEGIN GLOBALS
 MODEL_PATH = "model/model_gtsrb.pth"
+# DEVICE = torch.device(
+#     "cuda" if torch.cuda.is_available() else "mps" if torch.has_mps else "cpu"
+# )
+# seems like mps is not truly "supported" on 1.12.0
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SHADOW_LEVEL = 0.43
 POSITION_LIST, MASK_LIST = load_mask()
@@ -30,7 +35,7 @@ def regime_one(out_file):
     model.load_state_dict(
         torch.load(
             MODEL_PATH,
-            map_location=torch.device(DEVICE),
+            map_location=DEVICE,
         )
     )
     pre_process = transforms.Compose([pre_process_image, transforms.ToTensor()])
@@ -44,7 +49,7 @@ def regime_one(out_file):
 
     results = {}
     success_no_edges = 0
-    for index in range(len(images)):
+    for index in tqdm(range(len(images))):
         mask_type = judge_mask_type("GTSRB", labels[index])
         if brightness(images[index], MASK_LIST[mask_type]) >= 120:
             adv_img, success, _ = attack(
@@ -55,7 +60,7 @@ def regime_one(out_file):
                 f"{INPUT_DIR}/{index}_{labels[index]}_{success}.png",
                 adv_img,
             )
-            print("Image {} saved!".format(index))
+            # print("Image {} saved!".format(index))
     print("******** Finished Generating Adversarial Images. *****")
     # push the images through the edge profiler
     dataset_val = TestDataset(

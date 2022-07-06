@@ -19,5 +19,6 @@ We use shadow_level = 0.43 (i.e., $k$) to be consistent with the paper.
 
 ## Steps to test
 
-1. Run `python -m testing.testing [regime-id] [output-file-path]` **from the `shadows_model` folder** to run the testing regime and receive output in `[output-file-path]`. Output will be a `.json` file containing statistics as a Python dictionary.
+0. Modify `config.json` parameters to match regime and output file.
+1. Run `python -m testing.testing` **from the `shadows_model` folder** to run the testing regime and receive output in `[output-file-path]`. Output will be a `.json` file containing statistics as a Python dictionary.
 2. Run `zsh cleanup.sh` or `bash cleanup.sh`, depending on your terminal, to clean up the `data/` folder for future use.
