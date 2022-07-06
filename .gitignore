@@ -1,6 +1,6 @@
 learning/
 DexiNed/
 LDC/
-shadows_model/testing/data
-shadows_model/__pycache__
-shadows_model/testing/__pycache__
+shadows_model/testing/data/
+shadows_model/__pycache__/
+shadows_model/testing/__pycache__/
