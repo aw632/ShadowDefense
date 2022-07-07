@@ -127,7 +127,8 @@ def main():
     # open config.json
     with open("testing/config.json", "r") as f:
         config = json.load(f)
-        test(config["regime"], config["output"])
+        output = "{}_{}.json".format(config["output"], config["regime"])
+        test(config["regime"], output)
 
 
 if __name__ == "__main__":
