@@ -1,8 +1,8 @@
 import pickle
-from gtsrb import GtsrbCNN, test_single_image
+import gtsrb
 import torch
 from torchvision import transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 from utils import judge_mask_type
 from utils import pre_process_image
 from utils import brightness
@@ -16,40 +16,32 @@ from tqdm import tqdm
 import cv2
 from os import listdir
 from os.path import isfile, join
+import numpy as np
 
 # BEGIN GLOBALS
 MODEL_PATH = "model/model_gtsrb.pth"
 # DEVICE = torch.device(
 #     "cuda" if torch.cuda.is_available() else "mps" if torch.has_mps else "cpu"
 # )
-# seems like mps is not truly "supported" on 1.12.0
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-SHADOW_LEVEL = 0.43
 POSITION_LIST, MASK_LIST = load_mask()
 INPUT_DIR = "testing/test_data/input"
 OUTPUT_DIR = "testing/test_data/output"
 N_CLASS = 43  # 43 classes in GTSRB
 
 
-def regime_one(out_file):
-    # load file from MODEL_PATH and store in variable "model"
-    model = GtsrbCNN(N_CLASS).to(DEVICE)
-    model.load_state_dict(
-        torch.load(
-            MODEL_PATH,
-            map_location=DEVICE,
-        )
-    )
-    # pre_process = transforms.Compose([pre_process_image, transforms.ToTensor()])
-    model.eval()  # set the model in evaluation mode
+def generate_adv_images(images, labels):
+    """Generates adversarial images by applying an artificial geometric shadow.
+    See "Shadows Can Be Dangerous" paper by Zhong et al, 2022 for more details.
 
-    # generate the adversarial images by calling shadow_attack
-    # note: the images are saved irregardless of the success of the attack
-    with open("./dataset/GTSRB/test.pkl", "rb") as dataset:
-        test_data = pickle.load(dataset)
-        images, labels = test_data["data"], test_data["labels"]
+    Args:
+        images (array of tensors): array of 3 channel RGB tensors representing images.
+        labels : class labels for each image in images.
 
-    results = {}
+    Returns:
+        success_no_edges (int): number of images that were successfully attacked.
+        total_num_images (int): total number of images in images.
+    """
     success_no_edges = 0
     total_num_images = 0
     for index in tqdm(range(len(images))):
@@ -65,12 +57,22 @@ def regime_one(out_file):
                 adv_img,
             )
     print("******** Finished Generating Adversarial Images. *****")
-    # push the images through the edge profiler
+    return success_no_edges, total_num_images
+
+
+def generate_edge_profiles(width, height):
+    """Generates edge profiles using DexiNed model. Outputs the edge profiles into
+    OUPUT_DIR.
+
+    Args:
+        width (int): width of the edge profile in pixels
+        height (int): height of the edge profile in pixels
+    """
     dataset_val = TestDataset(
         INPUT_DIR,
         test_data="CLASSIC",
-        img_width=512,
-        img_height=512,
+        img_width=width,
+        img_height=height,
         mean_bgr=[103.939, 116.779, 123.68, 137.86][0:3],
         test_list=None,
         arg=None,
@@ -87,6 +89,30 @@ def regime_one(out_file):
         DEVICE,
         OUTPUT_DIR,
     )
+
+
+def regime_one(out_file):
+    # load file from MODEL_PATH and store in variable "model"
+    model = gtsrb.GtsrbCNN(N_CLASS).to(DEVICE)
+    model.load_state_dict(
+        torch.load(
+            MODEL_PATH,
+            map_location=DEVICE,
+        )
+    )
+    # pre_process = transforms.Compose([pre_process_image, transforms.ToTensor()])
+    model.eval()  # set the model in evaluation mode
+
+    # generate the adversarial images by calling shadow_attack
+    # note: the images are saved irregardless of the success of the attack
+    with open("./dataset/GTSRB/test.pkl", "rb") as dataset:
+        test_data = pickle.load(dataset)
+        images, labels = test_data["data"], test_data["labels"]
+
+    results = {}
+    success_no_edges, total_num_images = generate_adv_images(images, labels)
+    # push the images through the edge profiler
+    generate_edge_profiles(512, 512)
     # test it on the model using "test_single_image"
     success_with_edges = 0
     confidence_with_edges = 0
@@ -96,7 +122,7 @@ def regime_one(out_file):
             # extract the string between the first and second underscore in file
             # and convert it to an integer
             label = int(file.split("_")[1])
-            _, success, confidence = test_single_image(path, label)
+            _, success, confidence = gtsrb.test_single_image(path, label)
             success_with_edges += (
                 success  # note, success here refers to a successful classification
             )
@@ -111,12 +137,142 @@ def regime_one(out_file):
         json.dump(results, f)
 
 
+class RegimeTwoDataset(Dataset):
+    """RegimeTwoDataset is a dataset class that takes in adversarial images from input and
+    edge profiles from output and returns a dataset of images and labels, where
+    images are adversarial images with edge profiles added as a channel.
+
+    Args:
+        Dataset (PyTorch Dataset): implements this superclass.
+    """
+
+    def __init__(self, input, output, transform):
+        """Initializes the class.
+
+        Args:
+            input (str): Directory from which to load adversarial images.
+            output (str): Directory from which to load edge profiles.
+            transform (bool): Whether to apply transforms to the images. See
+            transform_image function in the original paper's code.
+        """
+        super().__init__()
+        input_files = [join(input, file) for file in listdir(input)]
+        output_files = [join(output, file) for file in listdir(output)]
+        assert len(input_files) == len(
+            output_files
+        ), "Must have the same number of input and output files"
+        self.files = list(zip(input_files, output_files))
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.files)
+
+    def transform(self, image):
+        """Applies several randomized transformations to image, including
+        shear, translation, and angle of rotation to improve robustness.
+        """
+        # magic numbers from the paper
+        ang_range, shear_range, trans_range = 30, 5, 5
+        ang_rot = np.random.uniform(ang_range) - ang_range / 2
+        rows, cols, ch = image.shape
+        rot_m = cv2.getRotationMatrix2D((cols / 2, rows / 2), ang_rot, 1)
+
+        # Translation
+        tr_x = trans_range * np.random.uniform() - trans_range / 2
+        tr_y = trans_range * np.random.uniform() - trans_range / 2
+        trans_m = np.float32([[1, 0, tr_x], [0, 1, tr_y]])
+
+        # Shear
+        pts1 = np.float32([[5, 5], [20, 5], [5, 20]])
+
+        pt1 = 5 + shear_range * np.random.uniform() - shear_range / 2
+        pt2 = 20 + shear_range * np.random.uniform() - shear_range / 2
+
+        pts2 = np.float32([[pt1, 5], [pt2, pt1], [5, pt2]])
+
+        shear_m = cv2.getAffineTransform(pts1, pts2)
+
+        image = cv2.warpAffine(image, rot_m, (cols, rows))
+        image = cv2.warpAffine(image, trans_m, (cols, rows))
+        image = cv2.warpAffine(image, shear_m, (cols, rows))
+
+        return image
+
+    def preprocess_image(self, image):
+        """Preprocess the image. same as the paper author's but accounts for the
+        4th channel.
+        """
+        image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
+        image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
+        image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
+        image[:, :, 3] = cv2.equalizeHist(image[:, :, 3])
+        image = image / 255.0 - 0.5
+        return image
+
+    def __getitem__(self, idx):
+        adv_image_path, edge_profile_path = self.files[idx]
+        adv_image = cv2.imread(adv_image_path, cv2.IMREAD_COLOR)
+        edge_profile = cv2.imread(edge_profile_path, cv2.IMREAD_GRAYSCALE)
+
+        assert (
+            adv_image.shape[0] == edge_profile.shape[0]
+            and adv_image.shape[1] == edge_profile.shape[1]
+        ), "Adv image and edge profile must be the same size"
+
+        transform = transforms.Compose([transforms.ToTensor()])
+        adv_image = transform(adv_image)
+        edge_profile = transform(edge_profile)
+        # dim 0 is the channels.
+        img = torch.cat((adv_image, edge_profile), dim=0)
+        img = self.preprocess_image(img)
+        if self.transform:
+            img = self.transform(img)
+
+        # image path looks like testing/test_data/output/<id>_<label>_<success>.png
+        label = int(adv_image_path.split("_")[2])
+        return img, label
+
+
+def train_model():
+    """Train model trains the GtsrbCNN on the Regime 2 dataset."""
+    # generate adversarial images
+    with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
+        train_data = pickle.load(dataset)
+        images, labels = train_data["data"], train_data["labels"]
+
+    success_no_edges, total_num_images = generate_adv_images(images, labels)
+    # push the images through the edge profiler
+    generate_edge_profiles(32, 32)
+    # we want 32 x 32 edge profiles, greyscale, so we can add as a channel
+    dataset_train_without_augmentations = RegimeTwoDataset(
+        input=INPUT_DIR, output=OUTPUT_DIR, transform=False
+    )
+    dataset_train_with_augmentations = RegimeTwoDataset(
+        input=INPUT_DIR, output=OUTPUT_DIR, transform=True
+    )
+    dataset_train = torch.utils.data.ConcatDataset(
+        [dataset_train_without_augmentations, dataset_train_with_augmentations]
+    )
+    dataloader_train = DataLoader(
+        dataset_train, batch_size=1, shuffle=False, num_workers=6
+    )
+
+    num_epoch, batch_size = 25, 64
+    optimizer = torch.optim.Adam(
+        gtsrb.GtsrbCNN.parameters(), lr=0.001, weight_decay=1e-5
+    )
+
+
+def regime_two_a(out_file):
+    train_model()
+
+
 def test(regime, out_file):
     match regime:
         case "ONE":
             regime_one(out_file)
         case "TWO_A":
-            pass
+            regime_two_a(out_file)
         case "TWO_B":
             pass
         case "TWO_C":

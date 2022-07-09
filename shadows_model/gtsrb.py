@@ -135,7 +135,6 @@ def transform_image(image, ang_range, shear_range, trans_range, preprocess):
 
     return image
 
-
 def gen_extra_data(
     x_train,
     y_train,
@@ -269,38 +268,42 @@ def adversarial_augmentation(ori_data_train, ori_labels_train):
     return data_train, labels_train
 
 
-def train_model(adv_train=False):
-
-    with open("./dataset/GTSRB/train.pkl", "rb") as f:
-        train = pickle.load(f)
-        train_data, train_labels = train["data"], train["labels"]
-    with open("./dataset/GTSRB/test.pkl", "rb") as f:
-        test = pickle.load(f)
-        test_data, test_labels = test["data"], test["labels"]
-    print("data loaded!")
-    processed_train = (
-        np.array(
-            [pre_process_image(train_data[i]) for i in range(len(train_data))],
+def train_model(adv_train=False, regime_train=False, dataloader=None):
+    # precondition: dataloader is None iff regime_train = False.
+    if not regime_train:
+        with open("./dataset/GTSRB/train.pkl", "rb") as f:
+            train = pickle.load(f)
+            train_data, train_labels = train["data"], train["labels"]
+        with open("./dataset/GTSRB/test.pkl", "rb") as f:
+            test = pickle.load(f)
+            test_data, test_labels = test["data"], test["labels"]
+        print("data loaded!")
+        processed_train = (
+            np.array(
+                [pre_process_image(train_data[i]) for i in range(len(train_data))],
+                dtype=np.float32,
+            )
+            if not adv_train
+            else train_data
+        )
+        processed_test = np.array(
+            [pre_process_image(test_data[i]) for i in range(len(test_data))],
             dtype=np.float32,
         )
-        if not adv_train
-        else train_data
-    )
-    processed_test = np.array(
-        [pre_process_image(test_data[i]) for i in range(len(test_data))],
-        dtype=np.float32,
-    )
-    augment_data_train, augment_data_labels = gen_extra_data(
-        train_data, train_labels, 10, 30, 5, 5, 1, preprocess=not adv_train
-    )
+        augment_data_train, augment_data_labels = gen_extra_data(
+            train_data, train_labels, 10, 30, 5, 5, 1, preprocess=not adv_train
+        )
 
-    image_train = np.concatenate([processed_train, augment_data_train], 0)
-    label_train = np.concatenate([train_labels, augment_data_labels], 0)
-    image_test, label_test = processed_test, test_labels
+        image_train = np.concatenate([processed_train, augment_data_train], 0)
+        label_train = np.concatenate([train_labels, augment_data_labels], 0)
+        image_test, label_test = processed_test, test_labels
 
-    print("I'm training now!")
-    training_model = GtsrbCNN(n_class=class_n).to(device).apply(weights_init)
-    training(training_model, image_train, label_train, image_test, label_test)
+        print("I'm training now!")
+        training_model = GtsrbCNN(n_class=class_n).to(device).apply(weights_init)
+        training(training_model, image_train, label_train, image_test, label_test)
+    else:
+        print("I'm training now!")
+        pass
 
 
 def test_model(adv_model=False):
