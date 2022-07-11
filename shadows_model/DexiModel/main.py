@@ -10,10 +10,10 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from DexiNed.datasets import DATASET_NAMES, BipedDataset, TestDataset, dataset_info
-from DexiNed.losses import *
-from DexiNed.model import DexiNed
-from DexiNed.utils import (
+from DexiModel.datasets import DATASET_NAMES, BipedDataset, TestDataset, dataset_info
+from DexiModel.losses import *
+from DexiModel.model import DexiNed
+from DexiModel.utils import (
     image_normalization,
     save_image_batch_to_disk,
     visualize_result,

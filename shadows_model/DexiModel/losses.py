@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from DexiNed.dexi_utils import *
+from DexiModel.dexi_utils import *
 
 
 def hed_loss2(inputs, targets, l_weight=1.1):

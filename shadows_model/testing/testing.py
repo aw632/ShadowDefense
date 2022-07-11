@@ -9,9 +9,9 @@ from utils import brightness
 from utils import load_mask
 from utils import SmoothCrossEntropyLoss
 from shadow_attack import attack
-import DexiNed.main as dnm
-from DexiNed.model import DexiNed
-from DexiNed.datasets import TestDataset
+import DexiModel.main as dnm
+from DexiModel.model import DexiNed
+from DexiModel.datasets import TestDataset
 import json
 from tqdm import tqdm
 import cv2
@@ -30,7 +30,7 @@ POSITION_LIST, MASK_LIST = load_mask()
 INPUT_DIR = "testing/test_data/input"
 OUTPUT_DIR = "testing/test_data/output"
 N_CLASS = 43  # 43 classes in GTSRB
-REGIME_TWO_MODEL = "testing/regime_two_model.pth"
+REGIME_TWO_MODEL = "./testing/regime_two_model.pth"
 
 
 def generate_adv_images(images, labels):
@@ -404,7 +404,7 @@ def test(regime, out_file):
         case "ONE":
             regime_one(out_file)
         case "TWO_A":
-            regime_two_a(out_file)
+            regime_two_a(out_file, fresh_start=True)
         case "TWO_B":
             raise ValueError("Regime 2B is not implemented")
         case "TWO_C":
