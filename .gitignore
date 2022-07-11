@@ -3,4 +3,4 @@ LDC/
 shadows_model/__pycache__/
 shadows_model/testing/__pycache__/
 shadows_model/testing/test_data/input/*
-shadows_model/testing/test_data/output
+shadows_model/testing/test_data/output/*
