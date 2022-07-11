@@ -155,7 +155,7 @@ def attack(
     global_best_solution = float("inf")
     global_best_position = None
 
-    for attempt in range(n_try):
+    for attempt in range(1):
 
         if succeed:
             break
