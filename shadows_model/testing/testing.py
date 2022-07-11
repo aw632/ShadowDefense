@@ -22,15 +22,16 @@ import subprocess
 
 # BEGIN GLOBALS
 REGIME_ONE_MODEL = "model/model_gtsrb.pth"
-DEVICE = torch.device(
-    "cuda" if torch.cuda.is_available() else "mps" if torch.has_mps else "cpu"
-)
+# DEVICE = torch.device(
+#     "cuda" if torch.cuda.is_available() else "mps" if torch.has_mps else "cpu"
+# )
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 POSITION_LIST, MASK_LIST = load_mask()
 INPUT_DIR = "testing/test_data/input"
 OUTPUT_DIR = "testing/test_data/output"
 N_CLASS = 43  # 43 classes in GTSRB
 REGIME_TWO_MODEL = "./testing/regime_two_model.pth"
+LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
 
 
 def generate_adv_images(images, labels):
@@ -81,7 +82,7 @@ def generate_edge_profiles(width, height):
         arg=None,
         # arg not needed since test_data = CLASSIC
     )
-    dataloader_val = DataLoader(dataset_val, batch_size=1, shuffle=False, num_workers=6)
+    dataloader_val = DataLoader(dataset_val, batch_size=1, shuffle=False)
 
     deximodel = DexiNed().to(DEVICE)
     print("******** Starting Testing. *****")
@@ -178,7 +179,7 @@ class RegimeTwoDataset(Dataset):
     def __len__(self):
         return len(self.files)
 
-    def transform(self, image):
+    def transform_img(self, image):
         """Applies several randomized transformations to image, including
         shear, translation, and angle of rotation to improve robustness.
         """
@@ -235,12 +236,14 @@ class RegimeTwoDataset(Dataset):
         edge_profile = transform(edge_profile)
         # dim 0 is the channels.
         img = torch.cat((adv_image, edge_profile), dim=0)
-        img = self.preprocess_image(img)
+        img = img.numpy()
+        img = self.preprocess_image(img.astype(np.uint8))
         if self.transform:
-            img = self.transform(img)
+            img = self.transform_img(img)
 
         # image path looks like testing/test_data/output/<id>_<label>_<success>.png
         label = int(adv_image_path.split("_")[2])
+        img = torch.from_numpy(img)
         return img, label
 
 
@@ -321,14 +324,15 @@ def train_model():
     dataset_train = ConcatDataset(
         [dataset_train_without_augmentations, dataset_train_with_augmentations]
     )
-    dataloader_train = DataLoader(
-        dataset_train, batch_size=64, shuffle=False, num_workers=6
-    )
-    loss_fun = SmoothCrossEntropyLoss(smoothing=0.1)
+    dataloader_train = DataLoader(dataset_train, batch_size=64, shuffle=False)
 
+    print("******** I'm training the Regime Two Model Now! *****")
     num_epoch = 15
-    optimizer = torch.optim.Adam(RegimeTwoCNN.parameters(), lr=0.001, weight_decay=1e-5)
     training_model = RegimeTwoCNN().to(DEVICE).apply(gtsrb.weights_init)
+    optimizer = torch.optim.Adam(
+        training_model.parameters(), lr=0.001, weight_decay=1e-5
+    )
+    training_model = training_model.double()
     for _ in range(num_epoch):
         # epoch_start = time.time()
         training_model.train()
@@ -336,7 +340,7 @@ def train_model():
 
         for data_batch in dataloader_train:
             train_predict = training_model(data_batch[0].to(DEVICE))
-            batch_loss = loss_fun(train_predict, data_batch[1].to(DEVICE))
+            batch_loss = LOSS_FUN(train_predict, data_batch[1].to(DEVICE))
             batch_loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -347,7 +351,7 @@ def train_model():
             f"Train Acc: {round(float(acc / dataset_train.__len__()), 4)}",
             end=" ",
         )
-        print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end=" | ")
+        print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end="\n")
 
     torch.save(
         training_model.state_dict(),
@@ -356,6 +360,55 @@ def train_model():
 
 
 def regime_two_a(out_file, fresh_start=False):
+    """See instructions.md
+    Args:
+        out_file: file to write the results to
+        fresh_start: if true, will train a fresh model, otherwise load the model.
+    """
+    if fresh_start:
+        train_model()
+        subprocess.call(["sh", "./cleanup.sh"])
+    model = RegimeTwoCNN().to(DEVICE)
+    model = model.double()
+    model.load_state_dict(
+        torch.load(
+            REGIME_TWO_MODEL,
+            map_location=DEVICE,
+        )
+    )
+    model.eval()
+
+    print("******** I'm testing the Regime Two Model Now! *****")
+    with open("./dataset/GTSRB/test.pkl", "rb") as dataset:
+        test_data = pickle.load(dataset)
+        images, labels = test_data["data"], test_data["labels"]
+
+    generate_adv_images(images, labels)  # >>> INPUT_DIR
+    generate_edge_profiles(32, 32)  # >>> OUTPUT_DIR
+
+    # print(len(listdir(INPUT_DIR)), len(listdir(OUTPUT_DIR)))
+    dataset_test = RegimeTwoDataset(input=INPUT_DIR, output=OUTPUT_DIR, transform=False)
+    dataloader_test = DataLoader(dataset_test, batch_size=64, shuffle=False)
+    with torch.no_grad():
+        loss = acc = 0.0
+
+        for data_batch in dataloader_test:
+            train_predict = model(data_batch[0].to(DEVICE))
+            batch_loss = LOSS_FUN(train_predict, data_batch[1].to(DEVICE))
+            acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
+            loss += batch_loss.item() * len(data_batch[1])
+
+    total_num_images = dataset_test.__len__()
+    results = {}
+    print(f"Test Acc: {round(float(acc / total_num_images), 4)}")
+    results["robustness_with_edges"] = round(float(acc / total_num_images), 4)
+    # results["confidence_with_edges"] = confidence_with_edges / total_num_images
+    # save the results to out_file
+    with open(out_file, "w") as f:
+        json.dump(results, f)
+
+
+def regime_two_b(out_file, fresh_start=False):
     """See instructions.md
     Args:
         out_file: file to write the results to
@@ -392,7 +445,7 @@ def regime_two_a(out_file, fresh_start=False):
         json.dump(results, f)
 
 
-def test(regime, out_file):
+def test(regime, out_file, fresh_start):
     """Control flow for the desired testing regime.
 
     Args:
@@ -404,7 +457,7 @@ def test(regime, out_file):
         case "ONE":
             regime_one(out_file)
         case "TWO_A":
-            regime_two_a(out_file, fresh_start=True)
+            regime_two_a(out_file, fresh_start=bool(fresh_start))
         case "TWO_B":
             raise ValueError("Regime 2B is not implemented")
         case "TWO_C":
@@ -416,7 +469,7 @@ def main():
     with open("testing/config.json", "r") as f:
         config = json.load(f)
         output = "{}_{}.json".format(config["output"], config["regime"])
-        test(config["regime"], output)
+        test(config["regime"], output, config["fresh_start"])
 
 
 if __name__ == "__main__":

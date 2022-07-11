@@ -1,4 +1,5 @@
 {
   "regime": "TWO_A",
-  "output": "output_regime"
+  "output": "output_regime",
+  "fresh_start": "True"
 }
