@@ -2,11 +2,12 @@ import pickle
 import gtsrb
 import torch
 from torchvision import transforms
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader, Dataset, ConcatDataset
+import torch.nn as nn
 from utils import judge_mask_type
-from utils import pre_process_image
 from utils import brightness
 from utils import load_mask
+from utils import SmoothCrossEntropyLoss
 from shadow_attack import attack
 import DexiNed.main as dnm
 from DexiNed.model import DexiNed
@@ -17,17 +18,19 @@ import cv2
 from os import listdir
 from os.path import isfile, join
 import numpy as np
+import subprocess
 
 # BEGIN GLOBALS
-MODEL_PATH = "model/model_gtsrb.pth"
-# DEVICE = torch.device(
-#     "cuda" if torch.cuda.is_available() else "mps" if torch.has_mps else "cpu"
-# )
+REGIME_ONE_MODEL = "model/model_gtsrb.pth"
+DEVICE = torch.device(
+    "cuda" if torch.cuda.is_available() else "mps" if torch.has_mps else "cpu"
+)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 POSITION_LIST, MASK_LIST = load_mask()
 INPUT_DIR = "testing/test_data/input"
 OUTPUT_DIR = "testing/test_data/output"
 N_CLASS = 43  # 43 classes in GTSRB
+REGIME_TWO_MODEL = "testing/regime_two_model.pth"
 
 
 def generate_adv_images(images, labels):
@@ -91,12 +94,32 @@ def generate_edge_profiles(width, height):
     )
 
 
+def evaluate_edge_profiles():
+    success_with_edges = 0
+    confidence_with_edges = 0
+    total_num_images = 0
+    for file in tqdm(listdir(OUTPUT_DIR)):
+        path = join(OUTPUT_DIR, file)
+        if isfile(path):
+            # extract the string between the first and second underscore in file
+            # and convert it to an integer
+            label = int(file.split("_")[1])
+            _, success, confidence = gtsrb.test_single_image(path, label)
+            success_with_edges += (
+                success  # note, success here refers to a successful classification
+            )
+            confidence_with_edges += confidence
+            total_num_images += 1
+
+    return success_with_edges, confidence_with_edges, total_num_images
+
+
 def regime_one(out_file):
-    # load file from MODEL_PATH and store in variable "model"
+    # load file from REGIME_ONE_MODEL and store in variable "model"
     model = gtsrb.GtsrbCNN(N_CLASS).to(DEVICE)
     model.load_state_dict(
         torch.load(
-            MODEL_PATH,
+            REGIME_ONE_MODEL,
             map_location=DEVICE,
         )
     )
@@ -114,19 +137,7 @@ def regime_one(out_file):
     # push the images through the edge profiler
     generate_edge_profiles(512, 512)
     # test it on the model using "test_single_image"
-    success_with_edges = 0
-    confidence_with_edges = 0
-    for file in tqdm(listdir(OUTPUT_DIR)):
-        path = join(OUTPUT_DIR, file)
-        if isfile(path):
-            # extract the string between the first and second underscore in file
-            # and convert it to an integer
-            label = int(file.split("_")[1])
-            _, success, confidence = gtsrb.test_single_image(path, label)
-            success_with_edges += (
-                success  # note, success here refers to a successful classification
-            )
-            confidence_with_edges += confidence
+    success_with_edges, confidence_with_edges, _ = evaluate_edge_profiles()
 
     # robustness = 1 - success of attacks
     results["robustness_no_edges"] = 1 - (success_no_edges / total_num_images)
@@ -233,6 +244,63 @@ class RegimeTwoDataset(Dataset):
         return img, label
 
 
+class RegimeTwoCNN(nn.Module):
+    def __init__(self):
+
+        super().__init__()
+        self.color_map = nn.Conv2d(4, 4, (1, 1), stride=(1, 1), padding=0)
+        self.module1 = nn.Sequential(
+            nn.Conv2d(4, 32, (5, 5), stride=(1, 1), padding=2),
+            nn.ReLU(),
+            nn.Conv2d(32, 32, (5, 5), stride=(1, 1), padding=2),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+        )
+        self.module2 = nn.Sequential(
+            nn.Conv2d(32, 64, (5, 5), stride=(1, 1), padding=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, (5, 5), stride=(1, 1), padding=2),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+        )
+        self.module3 = nn.Sequential(
+            nn.Conv2d(64, 128, (5, 5), stride=(1, 1), padding=2),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, (5, 5), stride=(1, 1), padding=2),
+            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+        )
+        self.fc1 = nn.Sequential(
+            nn.Linear(14336, 1024, bias=True), nn.ReLU(), nn.Dropout(p=0.5)
+        )
+        self.fc2 = nn.Sequential(
+            nn.Linear(1024, 1024, bias=True),
+            nn.ReLU(),
+            nn.Dropout(p=0.5),
+        )
+        self.fc3 = nn.Linear(1024, 43, bias=True)
+
+    def forward(self, x):
+
+        x = self.color_map(x)
+        branch1 = self.module1(x)
+        branch2 = self.module2(branch1)
+        branch3 = self.module3(branch2)
+
+        branch1 = branch1.reshape(branch1.shape[0], -1)
+        branch2 = branch2.reshape(branch2.shape[0], -1)
+        branch3 = branch3.reshape(branch3.shape[0], -1)
+        concat = torch.cat([branch1, branch2, branch3], 1)
+
+        out = self.fc1(concat)
+        out = self.fc2(out)
+        out = self.fc3(out)
+        return out
+
+
 def train_model():
     """Train model trains the GtsrbCNN on the Regime 2 dataset."""
     # generate adversarial images
@@ -250,33 +318,97 @@ def train_model():
     dataset_train_with_augmentations = RegimeTwoDataset(
         input=INPUT_DIR, output=OUTPUT_DIR, transform=True
     )
-    dataset_train = torch.utils.data.ConcatDataset(
+    dataset_train = ConcatDataset(
         [dataset_train_without_augmentations, dataset_train_with_augmentations]
     )
     dataloader_train = DataLoader(
-        dataset_train, batch_size=1, shuffle=False, num_workers=6
+        dataset_train, batch_size=64, shuffle=False, num_workers=6
+    )
+    loss_fun = SmoothCrossEntropyLoss(smoothing=0.1)
+
+    num_epoch = 25
+    optimizer = torch.optim.Adam(RegimeTwoCNN.parameters(), lr=0.001, weight_decay=1e-5)
+    training_model = RegimeTwoCNN().to(DEVICE).apply(gtsrb.weights_init)
+    for _ in range(num_epoch):
+        # epoch_start = time.time()
+        training_model.train()
+        loss = acc = 0.0
+
+        for data_batch in dataloader_train:
+            train_predict = training_model(data_batch[0].to(DEVICE))
+            batch_loss = loss_fun(train_predict, data_batch[1].to(DEVICE))
+            batch_loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
+            loss += batch_loss.item() * len(data_batch[1])
+        # epoch_end = time.time()
+        print(
+            f"Train Acc: {round(float(acc / dataset_train.__len__()), 4)}",
+            end=" ",
+        )
+        print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end=" | ")
+
+    torch.save(
+        training_model.state_dict(),
+        REGIME_TWO_MODEL,
     )
 
-    num_epoch, batch_size = 25, 64
-    optimizer = torch.optim.Adam(
-        gtsrb.GtsrbCNN.parameters(), lr=0.001, weight_decay=1e-5
+
+def regime_two_a(out_file, fresh_start=False):
+    """See instructions.md
+    Args:
+        out_file: file to write the results to
+        fresh_start: if true, will train a fresh model, otherwise load the model.
+    """
+    if fresh_start:
+        train_model()
+        subprocess.call(["sh", "./cleanup.sh"])
+    model = RegimeTwoCNN().to(DEVICE)
+    model.load_state_dict(
+        torch.load(
+            REGIME_TWO_MODEL,
+            map_location=DEVICE,
+        )
     )
+    model.eval()
 
+    with open("./dataset/GTSRB/test.pkl", "rb") as dataset:
+        test_data = pickle.load(dataset)
+        images, labels = test_data["data"], test_data["labels"]
 
-def regime_two_a(out_file):
-    train_model()
+    generate_adv_images(images, labels)
+    generate_edge_profiles(32, 32)
+    (
+        success_with_edges,
+        confidence_with_edges,
+        total_num_images,
+    ) = evaluate_edge_profiles()
+    results = {}
+    results["robustness_with_edges"] = success_with_edges / total_num_images
+    results["confidence_with_edges"] = confidence_with_edges / total_num_images
+    # save the results to out_file
+    with open(out_file, "w") as f:
+        json.dump(results, f)
 
 
 def test(regime, out_file):
+    """Control flow for the desired testing regime.
+
+    Args:
+        regime (string): One of "ONE, TWO_A, TWO_B, TWO_C".
+        out_file (string): name of the output file. Will be saved in
+        /shadows_mode/testing.
+    """
     match regime:
         case "ONE":
             regime_one(out_file)
         case "TWO_A":
             regime_two_a(out_file)
         case "TWO_B":
-            pass
+            raise ValueError("Regime 2B is not implemented")
         case "TWO_C":
-            pass
+            raise ValueError("Regime 2C is not implemented")
 
 
 def main():

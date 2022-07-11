@@ -135,6 +135,7 @@ def transform_image(image, ang_range, shear_range, trans_range, preprocess):
 
     return image
 
+
 def gen_extra_data(
     x_train,
     y_train,
