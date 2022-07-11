@@ -308,7 +308,7 @@ def train_model():
         train_data = pickle.load(dataset)
         images, labels = train_data["data"], train_data["labels"]
 
-    success_no_edges, total_num_images = generate_adv_images(images, labels)
+    _, _ = generate_adv_images(images, labels)
     # push the images through the edge profiler
     generate_edge_profiles(32, 32)
     # we want 32 x 32 edge profiles, greyscale, so we can add as a channel
