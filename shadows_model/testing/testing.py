@@ -326,7 +326,7 @@ def train_model():
     )
     loss_fun = SmoothCrossEntropyLoss(smoothing=0.1)
 
-    num_epoch = 25
+    num_epoch = 15
     optimizer = torch.optim.Adam(RegimeTwoCNN.parameters(), lr=0.001, weight_decay=1e-5)
     training_model = RegimeTwoCNN().to(DEVICE).apply(gtsrb.weights_init)
     for _ in range(num_epoch):
