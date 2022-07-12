@@ -3,6 +3,7 @@ import gtsrb
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset, ConcatDataset, SubsetRandomSampler
+import torch.multiprocessing as mp
 import torch.nn as nn
 from utils import judge_mask_type
 from utils import brightness
@@ -389,7 +390,6 @@ class RegimeTwoDataset(Dataset):
         edge_profile = transform(edge_profile)
         img = transform(img)
         img = torch.cat((img, edge_profile), dim=0)
-
         img = img.numpy()
         img = self.preprocess_image(img.astype(np.uint8))
         img = torch.from_numpy(img)
@@ -468,7 +468,7 @@ def train_model():
     num_train = len(dataset_train)
     indices = list(range(num_train))
     np.random.shuffle(indices)
-    split = int(np.floor(0.4 * num_train))
+    split = int(np.floor(0.1 * num_train))
     train_idx = indices[:split]
     train_sampler = SubsetRandomSampler(train_idx)
 
@@ -687,5 +687,6 @@ def main():
 
 
 if __name__ == "__main__":
+    mp.set_start_method('spawn', force=True)
     print(DEVICE)
     main()
