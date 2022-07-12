@@ -438,19 +438,19 @@ def train_model():
         images, labels = train_data["data"], train_data["labels"]
 
     datasets = []
-    # for trans, adv in tqdm(
-    #     [(False, False), (True, True), (True, False), (False, True)]
-    # ):
-    #     datasets.append(RegimeTwoDataset(images, labels, transform=trans, use_adv=adv))
-    datasets.append(
-        RegimeTwoDataset(images=images, labels=labels, transform=False, use_adv=True)
-    )
+    for trans, adv in tqdm(
+        [(False, False), (True, True), (True, False), (False, True)]
+    ):
+        datasets.append(RegimeTwoDataset(images, labels, transform=trans, use_adv=adv))
+    # datasets.append(
+    #     RegimeTwoDataset(images=images, labels=labels, transform=False, use_adv=True)
+    # )
     dataset_train = ConcatDataset(datasets)
 
     num_train = len(dataset_train)
     indices = list(range(num_train))
     np.random.shuffle(indices)
-    split = int(np.floor(0.1 * num_train))
+    split = int(np.floor(0.0001 * num_train))
     train_idx = indices[:split]
     train_sampler = SubsetRandomSampler(train_idx)
 
