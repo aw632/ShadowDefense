@@ -353,8 +353,6 @@ class RegimeTwoDataset(Dataset):
             mask_type = judge_mask_type("GTSRB", label)
             if brightness(img, MASK_LIST[mask_type]) >= 120:
                 img, _, _ = attack(img, label, POSITION_LIST[mask_type], testing=True)
-        # if self.transform:
-        #     img = self.transform_img(img)
         cv2.imwrite("./testing/test_data/input/{}_{}_adv.png".format(idx, label), img)
         #  #FOR DEBUGGING ONLY
         # add the edge profile
@@ -367,6 +365,8 @@ class RegimeTwoDataset(Dataset):
         img = transform(img)
         img = torch.cat((img, edge_profile), dim=0)
         img = img.numpy()
+        if self.transform:
+            img = self.transform_img(img)
         img = self.preprocess_image(img.astype(np.uint8))
         img = torch.from_numpy(img)
         return img, label
@@ -455,11 +455,11 @@ def train_model():
     train_sampler = SubsetRandomSampler(train_idx)
 
     dataloader_train = DataLoader(
-        dataset_train, batch_size=1, sampler=train_sampler, num_workers=6
+        dataset_train, batch_size=64, sampler=train_sampler, num_workers=6
     )
 
     print("******** I'm training the Regime Two Model Now! *****")
-    num_epoch = 25
+    num_epoch = 10
     training_model = RegimeTwoCNN().to(DEVICE).apply(gtsrb.weights_init)
     optimizer = torch.optim.Adam(
         training_model.parameters(), lr=0.001, weight_decay=1e-5
