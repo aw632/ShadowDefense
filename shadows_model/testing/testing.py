@@ -396,7 +396,7 @@ class RegimeTwoCNN(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
             nn.ReLU(),
             nn.BatchNorm2d(32),
-            nn.Dropout(p=0.4),
+            nn.Dropout(p=0.3),
         )
         self.module2 = nn.Sequential(
             nn.Conv2d(32, 64, (5, 5), stride=(1, 1), padding=2),
@@ -405,7 +405,7 @@ class RegimeTwoCNN(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
             nn.ReLU(),
             nn.BatchNorm2d(64),
-            nn.Dropout(p=0.4),
+            nn.Dropout(p=0.3),
         )
         self.module3 = nn.Sequential(
             nn.Conv2d(64, 128, (5, 5), stride=(1, 1), padding=2),
@@ -414,7 +414,7 @@ class RegimeTwoCNN(nn.Module):
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
             nn.ReLU(),
             nn.BatchNorm2d(128),
-            nn.Dropout(p=0.4),
+            nn.Dropout(p=0.3),
         )
         self.fc1 = nn.Sequential(
             nn.Linear(14336, 1024, bias=True), nn.ReLU(), nn.Dropout(p=0.5)
@@ -422,7 +422,7 @@ class RegimeTwoCNN(nn.Module):
         self.fc2 = nn.Sequential(
             nn.Linear(1024, 1024, bias=True),
             nn.ReLU(),
-            nn.Dropout(p=0.4),
+            nn.Dropout(p=0.3),
         )
         self.fc3 = nn.Linear(1024, 43, bias=True)
 
