@@ -459,7 +459,9 @@ def train_model():
         images, labels = train_data["data"], train_data["labels"]
 
     datasets = []
-    for trans, adv in tqdm([(False, False), (True, True), (True, False), (False, True)]):
+    for trans, adv in tqdm(
+        [(False, False), (True, True), (True, False), (False, True)]
+    ):
         datasets.append(RegimeTwoDataset(images, labels, transform=trans, use_adv=adv))
     dataset_train = ConcatDataset(datasets)
 
@@ -470,7 +472,9 @@ def train_model():
     train_idx = indices[:split]
     train_sampler = SubsetRandomSampler(train_idx)
 
-    dataloader_train = DataLoader(dataset_train, batch_size=64, sampler=train_sampler)
+    dataloader_train = DataLoader(
+        dataset_train, batch_size=64, sampler=train_sampler, num_workers=6
+    )
 
     print("******** I'm training the Regime Two Model Now! *****")
     num_epoch = 10
@@ -501,8 +505,8 @@ def train_model():
         print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end="\n")
 
         torch.save(
-        training_model.state_dict(),
-        "./testing/regime_two_model_early{}".format(epoch),
+            training_model.state_dict(),
+            "./testing/regime_two_model_early{}".format(epoch),
         )
 
     torch.save(
