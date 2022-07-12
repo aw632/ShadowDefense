@@ -353,14 +353,14 @@ class RegimeTwoDataset(Dataset):
             mask_type = judge_mask_type("GTSRB", label)
             if brightness(img, MASK_LIST[mask_type]) >= 120:
                 img, _, _ = attack(img, label, POSITION_LIST[mask_type], testing=True)
-        cv2.imwrite("./testing/test_data/input/{}_{}_adv.png".format(idx, label), img)
+        # cv2.imwrite("./testing/test_data/input/{}_{}_adv.png".format(idx, label), img)
         #  #FOR DEBUGGING ONLY
         # add the edge profile
         transform = transforms.Compose([transforms.ToTensor()])
         edge_profile = auto_canny(img)
-        cv2.imwrite(
-            "./testing/test_data/output/{}_{}edge.png".format(idx, label), edge_profile
-        )  # FOR DEBUGGING ONLY
+        # cv2.imwrite(
+        #     "./testing/test_data/output/{}_{}edge.png".format(idx, label), edge_profile
+        # )  # FOR DEBUGGING ONLY
         edge_profile = transform(edge_profile)
         img = transform(img)
         img = torch.cat((img, edge_profile), dim=0)
@@ -450,7 +450,7 @@ def train_model():
     num_train = len(dataset_train)
     indices = list(range(num_train))
     np.random.shuffle(indices)
-    split = int(np.floor(0.0001 * num_train))
+    split = int(np.floor(0.1 * num_train))
     train_idx = indices[:split]
     train_sampler = SubsetRandomSampler(train_idx)
 
