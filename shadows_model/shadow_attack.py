@@ -30,6 +30,9 @@ with open("params.json", "rb") as f:
     device = params["device"]
     position_list, mask_list = load_mask()
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 parser = argparse.ArgumentParser(description="Adversarial attack by shadow")
 parser.add_argument(
     "--shadow_level", type=float, default=0.43, help="shadow coefficient k"
@@ -155,7 +158,7 @@ def attack(
     global_best_solution = float("inf")
     global_best_position = None
 
-    for attempt in range(1):
+    for attempt in range(5):
 
         if succeed:
             break

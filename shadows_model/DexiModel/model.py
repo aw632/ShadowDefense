@@ -27,15 +27,11 @@ def weight_init(m):
 
 
 class CoFusion(nn.Module):
-
     def __init__(self, in_ch, out_ch):
         super(CoFusion, self).__init__()
-        self.conv1 = nn.Conv2d(in_ch, 64, kernel_size=3,
-                               stride=1, padding=1)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3,
-                               stride=1, padding=1)
-        self.conv3 = nn.Conv2d(64, out_ch, kernel_size=3,
-                               stride=1, padding=1)
+        self.conv1 = nn.Conv2d(in_ch, 64, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(64, out_ch, kernel_size=3, stride=1, padding=1)
         self.relu = nn.ReLU()
 
         self.norm_layer1 = nn.GroupNorm(4, 64)
@@ -50,18 +46,30 @@ class CoFusion(nn.Module):
         # return ((fusecat * attn).sum(1)).unsqueeze(1)
         return ((x * attn).sum(1)).unsqueeze(1)
 
+
 class _DenseLayer(nn.Sequential):
     def __init__(self, input_features, out_features):
         super(_DenseLayer, self).__init__()
 
         # self.add_module('relu2', nn.ReLU(inplace=True)),
-        self.add_module('conv1', nn.Conv2d(input_features, out_features,
-                                           kernel_size=3, stride=1, padding=2, bias=True)),
-        self.add_module('norm1', nn.BatchNorm2d(out_features)),
-        self.add_module('relu1', nn.ReLU(inplace=True)),
-        self.add_module('conv2', nn.Conv2d(out_features, out_features,
-                                           kernel_size=3, stride=1, bias=True)),
-        self.add_module('norm2', nn.BatchNorm2d(out_features))
+        self.add_module(
+            "conv1",
+            nn.Conv2d(
+                input_features,
+                out_features,
+                kernel_size=3,
+                stride=1,
+                padding=2,
+                bias=True,
+            ),
+        ),
+        self.add_module("norm1", nn.BatchNorm2d(out_features)),
+        self.add_module("relu1", nn.ReLU(inplace=True)),
+        self.add_module(
+            "conv2",
+            nn.Conv2d(out_features, out_features, kernel_size=3, stride=1, bias=True),
+        ),
+        self.add_module("norm2", nn.BatchNorm2d(out_features))
 
     def forward(self, x):
         x1, x2 = x
@@ -78,7 +86,7 @@ class _DenseBlock(nn.Sequential):
         super(_DenseBlock, self).__init__()
         for i in range(num_layers):
             layer = _DenseLayer(input_features, out_features)
-            self.add_module('denselayer%d' % (i + 1), layer)
+            self.add_module("denselayer%d" % (i + 1), layer)
             input_features = out_features
 
 
@@ -94,15 +102,18 @@ class UpConvBlock(nn.Module):
 
     def make_deconv_layers(self, in_features, up_scale):
         layers = []
-        all_pads=[0,0,1,3,7]
+        all_pads = [0, 0, 1, 3, 7]
         for i in range(up_scale):
-            kernel_size = 2 ** up_scale
+            kernel_size = 2**up_scale
             pad = all_pads[up_scale]  # kernel_size-1
             out_features = self.compute_out_features(i, up_scale)
             layers.append(nn.Conv2d(in_features, out_features, 1))
             layers.append(nn.ReLU(inplace=True))
-            layers.append(nn.ConvTranspose2d(
-                out_features, out_features, kernel_size, stride=2, padding=pad))
+            layers.append(
+                nn.ConvTranspose2d(
+                    out_features, out_features, kernel_size, stride=2, padding=pad
+                )
+            )
             in_features = out_features
         return layers
 
@@ -114,13 +125,10 @@ class UpConvBlock(nn.Module):
 
 
 class SingleConvBlock(nn.Module):
-    def __init__(self, in_features, out_features, stride,
-                 use_bs=True
-                 ):
+    def __init__(self, in_features, out_features, stride, use_bs=True):
         super(SingleConvBlock, self).__init__()
         self.use_bn = use_bs
-        self.conv = nn.Conv2d(in_features, out_features, 1, stride=stride,
-                              bias=True)
+        self.conv = nn.Conv2d(in_features, out_features, 1, stride=stride, bias=True)
         self.bn = nn.BatchNorm2d(out_features)
 
     def forward(self, x):
@@ -131,17 +139,15 @@ class SingleConvBlock(nn.Module):
 
 
 class DoubleConvBlock(nn.Module):
-    def __init__(self, in_features, mid_features,
-                 out_features=None,
-                 stride=1,
-                 use_act=True):
+    def __init__(
+        self, in_features, mid_features, out_features=None, stride=1, use_act=True
+    ):
         super(DoubleConvBlock, self).__init__()
 
         self.use_act = use_act
         if out_features is None:
             out_features = mid_features
-        self.conv1 = nn.Conv2d(in_features, mid_features,
-                               3, padding=1, stride=stride)
+        self.conv1 = nn.Conv2d(in_features, mid_features, 3, padding=1, stride=stride)
         self.bn1 = nn.BatchNorm2d(mid_features)
         self.conv2 = nn.Conv2d(mid_features, out_features, 3, padding=1)
         self.bn2 = nn.BatchNorm2d(out_features)
@@ -159,13 +165,18 @@ class DoubleConvBlock(nn.Module):
 
 
 class DexiNed(nn.Module):
-    """ Definition of the DXtrem network. """
+    """Definition of the DXtrem network."""
 
     def __init__(self):
         super(DexiNed, self).__init__()
-        self.block_1 = DoubleConvBlock(3, 32, 64, stride=2,)
+        self.block_1 = DoubleConvBlock(
+            3,
+            32,
+            64,
+            stride=2,
+        )
         self.block_2 = DoubleConvBlock(64, 128, use_act=False)
-        self.dblock_3 = _DenseBlock(2, 128, 256) # [128,256,100,100]
+        self.dblock_3 = _DenseBlock(2, 128, 256)  # [128,256,100,100]
         self.dblock_4 = _DenseBlock(3, 256, 512)
         self.dblock_5 = _DenseBlock(3, 512, 512)
         self.dblock_6 = _DenseBlock(3, 512, 256)
@@ -176,7 +187,9 @@ class DexiNed(nn.Module):
         self.side_2 = SingleConvBlock(128, 256, 2)
         self.side_3 = SingleConvBlock(256, 512, 2)
         self.side_4 = SingleConvBlock(512, 512, 1)
-        self.side_5 = SingleConvBlock(512, 256, 1) # Sory I forget to comment this line :(
+        self.side_5 = SingleConvBlock(
+            512, 256, 1
+        )  # Sory I forget to comment this line :(
 
         # right skip connections, figure in Journal paper
         self.pre_dense_2 = SingleConvBlock(128, 256, 2)
@@ -185,27 +198,28 @@ class DexiNed(nn.Module):
         self.pre_dense_5 = SingleConvBlock(512, 512, 1)
         self.pre_dense_6 = SingleConvBlock(512, 256, 1)
 
-
         self.up_block_1 = UpConvBlock(64, 1)
         self.up_block_2 = UpConvBlock(128, 1)
         self.up_block_3 = UpConvBlock(256, 2)
         self.up_block_4 = UpConvBlock(512, 3)
         self.up_block_5 = UpConvBlock(512, 4)
         self.up_block_6 = UpConvBlock(256, 4)
-        self.block_cat = SingleConvBlock(6, 1, stride=1, use_bs=False) # hed fusion method
+        self.block_cat = SingleConvBlock(
+            6, 1, stride=1, use_bs=False
+        )  # hed fusion method
         # self.block_cat = CoFusion(6,6)# cats fusion method
-
 
         self.apply(weight_init)
 
     def slice(self, tensor, slice_shape):
         t_shape = tensor.shape
         height, width = slice_shape
-        if t_shape[-1]!=slice_shape[-1]:
+        if t_shape[-1] != slice_shape[-1]:
             new_tensor = F.interpolate(
-                tensor, size=(height, width), mode='bicubic',align_corners=False)
+                tensor, size=(height, width), mode="bicubic", align_corners=False
+            )
         else:
-            new_tensor=tensor
+            new_tensor = tensor
         # tensor[..., :height, :width]
         return new_tensor
 
@@ -225,13 +239,13 @@ class DexiNed(nn.Module):
         # Block 3
         block_3_pre_dense = self.pre_dense_3(block_2_down)
         block_3, _ = self.dblock_3([block_2_add, block_3_pre_dense])
-        block_3_down = self.maxpool(block_3) # [128,256,50,50]
+        block_3_down = self.maxpool(block_3)  # [128,256,50,50]
         block_3_add = block_3_down + block_2_side
         block_3_side = self.side_3(block_3_add)
 
         # Block 4
         block_2_resize_half = self.pre_dense_2(block_2_down)
-        block_4_pre_dense = self.pre_dense_4(block_3_down+block_2_resize_half)
+        block_4_pre_dense = self.pre_dense_4(block_3_down + block_2_resize_half)
         block_4, _ = self.dblock_4([block_3_add, block_4_pre_dense])
         block_4_down = self.maxpool(block_4)
         block_4_add = block_4_down + block_3_side
@@ -239,7 +253,8 @@ class DexiNed(nn.Module):
 
         # Block 5
         block_5_pre_dense = self.pre_dense_5(
-            block_4_down) #block_5_pre_dense_512 +block_4_down
+            block_4_down
+        )  # block_5_pre_dense_512 +block_4_down
         block_5, _ = self.dblock_5([block_4_add, block_5_pre_dense])
         block_5_add = block_5 + block_4_side
 
@@ -265,7 +280,7 @@ class DexiNed(nn.Module):
         return results
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     batch_size = 8
     img_height = 352
     img_width = 352

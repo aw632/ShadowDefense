@@ -14,6 +14,8 @@ with open("params.json", "r") as config:
     params = json.load(config)
     device = params["device"]
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 class Particle:
     r"""

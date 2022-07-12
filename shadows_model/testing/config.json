@@ -1,5 +1,4 @@
 {
-  "regime": "TWO_A",
-  "output": "output_regime",
-  "fresh_start": "True"
+  "regime": "TRAIN",
+  "output": "output_regime"
 }

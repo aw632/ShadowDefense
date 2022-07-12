@@ -89,9 +89,11 @@ def save_image_batch_to_disk(
     idx = 0
     for i_shape, file_name in zip(image_shape, file_names):
         tmp = tensor[:, idx, ...]
+
         tmp2 = tensor2[:, idx, ...] if tensor2 is not None else None
         # tmp = np.transpose(np.squeeze(tmp), [0, 1, 2])
         tmp = np.squeeze(tmp)
+        print(tmp.shape)
         tmp2 = np.squeeze(tmp2) if tensor2 is not None else None
 
         # Iterate our all 7 NN outputs for a particular image
@@ -100,12 +102,13 @@ def save_image_batch_to_disk(
             tmp_img = tmp[i]
             tmp_img = np.uint8(image_normalization(tmp_img))
             tmp_img = cv2.bitwise_not(tmp_img)
+
             # tmp_img[tmp_img < 0.0] = 0.0
             # tmp_img = 255.0 * (1.0 - tmp_img)
-            if tmp2 is not None:
-                tmp_img2 = tmp2[i]
-                tmp_img2 = np.uint8(image_normalization(tmp_img2))
-                tmp_img2 = cv2.bitwise_not(tmp_img2)
+            # if tmp2 is not None:
+            #     tmp_img2 = tmp2[i]
+            #     tmp_img2 = np.uint8(image_normalization(tmp_img2))
+            #     tmp_img2 = cv2.bitwise_not(tmp_img2)
 
             # Resize prediction to match input image size
             # if not tmp_img.shape[1] == i_shape[0] or not tmp_img.shape[0] == i_shape[1]:
@@ -116,13 +119,13 @@ def save_image_batch_to_disk(
             #         else None
             #     )
 
-            if tmp2 is not None:
-                tmp_mask = np.logical_and(tmp_img > 128, tmp_img2 < 128)
-                tmp_img = np.where(tmp_mask, tmp_img2, tmp_img)
-                preds.append(tmp_img)
+            # if tmp2 is not None:
+            #     tmp_mask = np.logical_and(tmp_img > 128, tmp_img2 < 128)
+            #     tmp_img = np.where(tmp_mask, tmp_img2, tmp_img)
+            #     preds.append(tmp_img)
 
-            else:
-                preds.append(tmp_img)
+            # else:
+            #     preds.append(tmp_img)
 
             if i == 6:
                 fuse = tmp_img
@@ -141,6 +144,7 @@ def save_image_batch_to_disk(
         # average = np.uint8(np.mean(average, axis=0))
         output_file_name_f = os.path.join(output_dir_f, file_name)
         # output_file_name_a = os.path.join(output_dir_a, file_name)
+        print(fuse)
         cv2.imwrite(output_file_name_f, fuse)
         # cv2.imwrite(output_file_name_a, average)
 

@@ -23,6 +23,7 @@ with open("params.json", "r") as config:
     position_list, _ = load_mask()
 
 loss_fun = SmoothCrossEntropyLoss(smoothing=0.1)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 class TrafficSignDataset(torch.utils.data.Dataset):

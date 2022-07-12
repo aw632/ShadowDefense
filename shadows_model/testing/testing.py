@@ -31,6 +31,7 @@ INPUT_DIR = "testing/test_data/input"
 OUTPUT_DIR = "testing/test_data/output"
 N_CLASS = 43  # 43 classes in GTSRB
 REGIME_TWO_MODEL = "./testing/regime_two_model.pth"
+DEXINED_MODEL = "./DexiModel/10_model.pth"
 LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
 
 
@@ -48,7 +49,8 @@ def generate_adv_images(images, labels):
     """
     success_no_edges = 0
     total_num_images = 0
-    for index in tqdm(range(len(images))):
+    # for index in tqdm(range(len(images))):
+    for index in range(1):
         mask_type = judge_mask_type("GTSRB", labels[index])
         if brightness(images[index], MASK_LIST[mask_type]) >= 120:
             adv_img, success, _ = attack(
@@ -149,6 +151,124 @@ def regime_one(out_file):
         json.dump(results, f)
 
 
+# class RegimeTwoDataset(Dataset):
+#     """RegimeTwoDataset is a dataset class that takes in adversarial images from input and
+#     edge profiles from output and returns a dataset of images and labels, where
+#     images are adversarial images with edge profiles added as a channel.
+
+#     Args:
+#         Dataset (PyTorch Dataset): implements this superclass.
+#     """
+
+#     def __init__(self, input, output, transform):
+#         """Initializes the class.
+
+#         Args:
+#             input (str): Directory from which to load adversarial images.
+#             output (str): Directory from which to load edge profiles.
+#             transform (bool): Whether to apply transforms to the images. See
+#             transform_image function in the original paper's code.
+#         """
+#         super().__init__()
+#         input_files = [join(input, file) for file in listdir(input)]
+#         output_files = [join(output, file) for file in listdir(output)]
+#         assert len(input_files) == len(
+#             output_files
+#         ), "Must have the same number of input and output files"
+#         self.files = list(zip(input_files, output_files))
+#         self.transform = transform
+
+#     def __len__(self):
+#         return len(self.files)
+
+#     def transform_img(self, image):
+#         """Applies several randomized transformations to image, including
+#         shear, translation, and angle of rotation to improve robustness.
+#         """
+#         # magic numbers from the paper
+#         ang_range, shear_range, trans_range = 30, 5, 5
+#         ang_rot = np.random.uniform(ang_range) - ang_range / 2
+#         rows, cols, ch = image.shape
+#         rot_m = cv2.getRotationMatrix2D((cols / 2, rows / 2), ang_rot, 1)
+
+#         # Translation
+#         tr_x = trans_range * np.random.uniform() - trans_range / 2
+#         tr_y = trans_range * np.random.uniform() - trans_range / 2
+#         trans_m = np.float32([[1, 0, tr_x], [0, 1, tr_y]])
+
+#         # Shear
+#         pts1 = np.float32([[5, 5], [20, 5], [5, 20]])
+
+#         pt1 = 5 + shear_range * np.random.uniform() - shear_range / 2
+#         pt2 = 20 + shear_range * np.random.uniform() - shear_range / 2
+
+#         pts2 = np.float32([[pt1, 5], [pt2, pt1], [5, pt2]])
+
+#         shear_m = cv2.getAffineTransform(pts1, pts2)
+
+#         image = cv2.warpAffine(image, rot_m, (cols, rows))
+#         image = cv2.warpAffine(image, trans_m, (cols, rows))
+#         image = cv2.warpAffine(image, shear_m, (cols, rows))
+
+#         return image
+
+#     def preprocess_image(self, image):
+#         """Preprocess the image. same as the paper author's but accounts for the
+#         4th channel.
+#         """
+#         image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
+#         image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
+#         image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
+#         image[:, :, 3] = cv2.equalizeHist(image[:, :, 3])
+#         image = image / 255.0 - 0.5
+#         return image
+
+#     def __getitem__(self, idx):
+#         adv_image_path, edge_profile_path = self.files[idx]
+#         adv_image = cv2.imread(adv_image_path, cv2.IMREAD_COLOR)
+#         edge_profile = cv2.imread(edge_profile_path, cv2.IMREAD_GRAYSCALE)
+
+#         assert (
+#             adv_image.shape[0] == edge_profile.shape[0]
+#             and adv_image.shape[1] == edge_profile.shape[1]
+#         ), "Adv image and edge profile must be the same size"
+
+#         transform = transforms.Compose([transforms.ToTensor()])
+#         adv_image = transform(adv_image)
+#         edge_profile = transform(edge_profile)
+#         # dim 0 is the channels.
+#         img = torch.cat((adv_image, edge_profile), dim=0)
+#         img = img.numpy()
+#         img = self.preprocess_image(img.astype(np.uint8))
+#         if self.transform:
+#             img = self.transform_img(img)
+
+#         # image path looks like testing/test_data/output/<id>_<label>_<success>.png
+#         label = int(adv_image_path.split("_")[2])
+#         img = torch.from_numpy(img)
+#         return img, label
+
+
+def image_normalization(img, img_min=0, img_max=255, epsilon=1e-12):
+    """This is a typical image normalization function
+    where the minimum and maximum of the image is needed
+    source: https://en.wikipedia.org/wiki/Normalization_(image_processing)
+
+    :param img: an image could be gray scale or color
+    :param img_min:  for default is 0
+    :param img_max: for default is 255
+
+    :return: a normalized image, if max is 255 the dtype is uint8
+    """
+
+    img = np.float32(img)
+    # whenever an inconsistent image
+    img = (img - np.min(img)) * (img_max - img_min) / (
+        (np.max(img) - np.min(img)) + epsilon
+    ) + img_min
+    return img
+
+
 class RegimeTwoDataset(Dataset):
     """RegimeTwoDataset is a dataset class that takes in adversarial images from input and
     edge profiles from output and returns a dataset of images and labels, where
@@ -158,26 +278,22 @@ class RegimeTwoDataset(Dataset):
         Dataset (PyTorch Dataset): implements this superclass.
     """
 
-    def __init__(self, input, output, transform):
-        """Initializes the class.
-
-        Args:
-            input (str): Directory from which to load adversarial images.
-            output (str): Directory from which to load edge profiles.
-            transform (bool): Whether to apply transforms to the images. See
-            transform_image function in the original paper's code.
-        """
+    def __init__(self, images, labels, transform, use_adv):
+        """Initializes the class."""
         super().__init__()
-        input_files = [join(input, file) for file in listdir(input)]
-        output_files = [join(output, file) for file in listdir(output)]
-        assert len(input_files) == len(
-            output_files
-        ), "Must have the same number of input and output files"
-        self.files = list(zip(input_files, output_files))
+        # input_files = [join(input, file) for file in listdir(input)]
+        # output_files = [join(output, file) for file in listdir(output)]
+        # assert len(input_files) == len(
+        #     output_files
+        # ), "Must have the same number of input and output files"
+        # self.files = list(zip(input_files, output_files))
+        self.images = images
+        self.labels = torch.LongTensor(labels)
         self.transform = transform
+        self.use_adv = use_adv
 
     def __len__(self):
-        return len(self.files)
+        return len(self.images)
 
     def transform_img(self, image):
         """Applies several randomized transformations to image, including
@@ -221,28 +337,61 @@ class RegimeTwoDataset(Dataset):
         image = image / 255.0 - 0.5
         return image
 
+    def generate_single_edge_profile(self, img):
+        """Generates a single edge profile from the image."""
+        model = DexiNed().to(DEVICE)
+        model.load_state_dict(torch.load(DEXINED_MODEL, map_location=DEVICE))
+        model.eval()
+
+        with torch.no_grad():
+            img = img.to(DEVICE)
+            pred = model(img)
+            edge_maps = []
+            for i in pred:
+                tmp = torch.sigmoid(i).cpu().detach().numpy()
+                edge_maps.append(tmp)
+            tensor = np.array(edge_maps)
+            tmp = tensor[:, 0, ...]
+            tmp = np.squeeze(tmp)
+            for i in range(tmp.shape[0]):
+                tmp_img = tmp[i]
+                tmp_img = np.uint8(image_normalization(tmp_img))
+                tmp_img = cv2.bitwise_not(tmp_img)
+                if i == 6:
+                    fuse = tmp_img
+                    fuse = fuse.astype(np.uint8)
+        return fuse
+
     def __getitem__(self, idx):
-        adv_image_path, edge_profile_path = self.files[idx]
-        adv_image = cv2.imread(adv_image_path, cv2.IMREAD_COLOR)
-        edge_profile = cv2.imread(edge_profile_path, cv2.IMREAD_GRAYSCALE)
-
-        assert (
-            adv_image.shape[0] == edge_profile.shape[0]
-            and adv_image.shape[1] == edge_profile.shape[1]
-        ), "Adv image and edge profile must be the same size"
-
-        transform = transforms.Compose([transforms.ToTensor()])
-        adv_image = transform(adv_image)
-        edge_profile = transform(edge_profile)
-        # dim 0 is the channels.
-        img = torch.cat((adv_image, edge_profile), dim=0)
-        img = img.numpy()
-        img = self.preprocess_image(img.astype(np.uint8))
+        img, label = self.images[idx], self.labels[idx]
+        if self.use_adv:  # make edge profiles of adversarial images
+            mask_type = judge_mask_type("GTSRB", label)
+            if brightness(img, MASK_LIST[mask_type]) >= 120:
+                img, _, _ = attack(img, label, POSITION_LIST[mask_type], testing=True)
         if self.transform:
             img = self.transform_img(img)
+        cv2.imwrite("./testing/test_data/input/{}_adv.png".format(idx), img)
 
-        # image path looks like testing/test_data/output/<id>_<label>_<success>.png
-        label = int(adv_image_path.split("_")[2])
+        # add the edge profile
+        transform = transforms.Compose([transforms.ToTensor()])
+
+        # image preprocessing
+        edge_img = img.copy()
+        edge_img = np.array(edge_img, dtype=np.float32)
+        edge_img -= [103.939, 116.779, 123.68, 137.86][0:3]
+        edge_img = edge_img.transpose((2, 0, 1))
+        edge_img = torch.from_numpy(edge_img.copy()).float()
+
+        edge_img = edge_img.unsqueeze(
+            0
+        )  # makes a batch of 1, because dexined model only accepts batches.
+        edge_profile = self.generate_single_edge_profile(edge_img)
+        edge_profile = transform(edge_profile)
+        img = transform(img)
+        img = torch.cat((img, edge_profile), dim=0)
+
+        img = img.numpy()
+        img = self.preprocess_image(img.astype(np.uint8))
         img = torch.from_numpy(img)
         return img, label
 
@@ -305,25 +454,14 @@ class RegimeTwoCNN(nn.Module):
 
 
 def train_model():
-    """Train model trains the GtsrbCNN on the Regime 2 dataset."""
-    # generate adversarial images
     with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
         train_data = pickle.load(dataset)
         images, labels = train_data["data"], train_data["labels"]
 
-    _, _ = generate_adv_images(images, labels)
-    # push the images through the edge profiler
-    generate_edge_profiles(32, 32)
-    # we want 32 x 32 edge profiles, greyscale, so we can add as a channel
-    dataset_train_without_augmentations = RegimeTwoDataset(
-        input=INPUT_DIR, output=OUTPUT_DIR, transform=False
-    )
-    dataset_train_with_augmentations = RegimeTwoDataset(
-        input=INPUT_DIR, output=OUTPUT_DIR, transform=True
-    )
-    dataset_train = ConcatDataset(
-        [dataset_train_without_augmentations, dataset_train_with_augmentations]
-    )
+    datasets = []
+    for trans, adv in [(False, False), (True, True), (True, False), (False, True)]:
+        datasets.append(RegimeTwoDataset(images, labels, transform=trans, use_adv=adv))
+    dataset_train = ConcatDataset(datasets)
     dataloader_train = DataLoader(dataset_train, batch_size=64, shuffle=False)
 
     print("******** I'm training the Regime Two Model Now! *****")
@@ -346,12 +484,12 @@ def train_model():
             optimizer.zero_grad()
             acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
             loss += batch_loss.item() * len(data_batch[1])
-        # epoch_end = time.time()
-        print(
-            f"Train Acc: {round(float(acc / dataset_train.__len__()), 4)}",
-            end=" ",
-        )
-        print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end="\n")
+    # epoch_end = time.time()
+    print(
+        f"Train Acc: {round(float(acc / dataset_train.__len__()), 4)}",
+        end=" ",
+    )
+    print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end="\n")
 
     torch.save(
         training_model.state_dict(),
@@ -359,15 +497,70 @@ def train_model():
     )
 
 
-def regime_two_a(out_file, fresh_start=False):
+# def train_model():
+#     """Train model trains the GtsrbCNN on the Regime 2 dataset."""
+#     # generate adversarial images
+#     with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
+#         train_data = pickle.load(dataset)
+#         images, labels = train_data["data"], train_data["labels"]
+
+#     _, _ = generate_adv_images(images, labels)
+#     # push the images through the edge profiler
+#     generate_edge_profiles(32, 32)
+#     # we want 32 x 32 edge profiles, greyscale, so we can add as a channel
+#     dataset_train_without_augmentations = RegimeTwoDataset(
+#         input=INPUT_DIR, output=OUTPUT_DIR, transform=False
+#     )
+#     dataset_train_with_augmentations = RegimeTwoDataset(
+#         input=INPUT_DIR, output=OUTPUT_DIR, transform=True
+#     )
+#     dataset_train = ConcatDataset(
+#         [dataset_train_without_augmentations, dataset_train_with_augmentations]
+#     )
+#     dataloader_train = DataLoader(dataset_train, batch_size=64, shuffle=False)
+
+#     print("******** I'm training the Regime Two Model Now! *****")
+#     num_epoch = 15
+#     training_model = RegimeTwoCNN().to(DEVICE).apply(gtsrb.weights_init)
+#     optimizer = torch.optim.Adam(
+#         training_model.parameters(), lr=0.001, weight_decay=1e-5
+#     )
+#     training_model = training_model.double()
+#     for _ in range(num_epoch):
+#         # epoch_start = time.time()
+#         training_model.train()
+#         loss = acc = 0.0
+
+#         for data_batch in dataloader_train:
+#             train_predict = training_model(data_batch[0].to(DEVICE))
+#             batch_loss = LOSS_FUN(train_predict, data_batch[1].to(DEVICE))
+#             batch_loss.backward()
+#             optimizer.step()
+#             optimizer.zero_grad()
+#             acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
+#             loss += batch_loss.item() * len(data_batch[1])
+#         # epoch_end = time.time()
+#         print(
+#             f"Train Acc: {round(float(acc / dataset_train.__len__()), 4)}",
+#             end=" ",
+#         )
+#         print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end="\n")
+
+#     torch.save(
+#         training_model.state_dict(),
+#         REGIME_TWO_MODEL,
+#     )
+
+
+def regime_two_a(out_file):
     """See instructions.md
     Args:
         out_file: file to write the results to
         fresh_start: if true, will train a fresh model, otherwise load the model.
     """
-    if fresh_start:
-        train_model()
-        subprocess.call(["sh", "./cleanup.sh"])
+    # if fresh_start:
+    #     train_model()
+    #     subprocess.call(["sh", "./cleanup.sh"])
     model = RegimeTwoCNN().to(DEVICE)
     model = model.double()
     model.load_state_dict(
@@ -378,17 +571,16 @@ def regime_two_a(out_file, fresh_start=False):
     )
     model.eval()
 
-    print("******** I'm testing the Regime Two Model Now! *****")
     with open("./dataset/GTSRB/test.pkl", "rb") as dataset:
         test_data = pickle.load(dataset)
         images, labels = test_data["data"], test_data["labels"]
 
-    generate_adv_images(images, labels)  # >>> INPUT_DIR
-    generate_edge_profiles(32, 32)  # >>> OUTPUT_DIR
-
-    # print(len(listdir(INPUT_DIR)), len(listdir(OUTPUT_DIR)))
-    dataset_test = RegimeTwoDataset(input=INPUT_DIR, output=OUTPUT_DIR, transform=False)
+    dataset_test = RegimeTwoDataset(
+        images=images, labels=labels, transform=True, use_adv=True
+    )
     dataloader_test = DataLoader(dataset_test, batch_size=64, shuffle=False)
+
+    print("******** I'm testing the Regime Two Model Now! *****")
     with torch.no_grad():
         loss = acc = 0.0
 
@@ -398,7 +590,7 @@ def regime_two_a(out_file, fresh_start=False):
             acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
             loss += batch_loss.item() * len(data_batch[1])
 
-    total_num_images = dataset_test.__len__()
+    total_num_images = dataloader_test.__len__()
     results = {}
     print(f"Test Acc: {round(float(acc / total_num_images), 4)}")
     results["robustness_with_edges"] = round(float(acc / total_num_images), 4)
@@ -445,21 +637,23 @@ def regime_two_b(out_file, fresh_start=False):
         json.dump(results, f)
 
 
-def test(regime, out_file, fresh_start):
+def test(regime, out_file):
     """Control flow for the desired testing regime.
 
     Args:
-        regime (string): One of "ONE, TWO_A, TWO_B, TWO_C".
+        regime (string): One of "TWO_A, TWO_B, TWO_C".
         out_file (string): name of the output file. Will be saved in
         /shadows_mode/testing.
     """
     match regime:
-        case "ONE":
-            regime_one(out_file)
+        # case "ONE":
+        #     regime_one(out_file)
+        case "TRAIN":
+            train_model()
         case "TWO_A":
-            regime_two_a(out_file, fresh_start=bool(fresh_start))
+            regime_two_a(out_file)
         case "TWO_B":
-            raise ValueError("Regime 2B is not implemented")
+            regime_two_b(out_file)
         case "TWO_C":
             raise ValueError("Regime 2C is not implemented")
 
@@ -468,8 +662,10 @@ def main():
     # open config.json
     with open("testing/config.json", "r") as f:
         config = json.load(f)
-        output = "{}_{}.json".format(config["output"], config["regime"])
-        test(config["regime"], output, config["fresh_start"])
+        #     output = "{}_{}.json".format(config["output"], config["regime"])
+        regime = config["regime"]
+        print("******** Now testing Regime {}! *****".format(regime))
+        test(regime, "{}_{}.json".format(config["output"], regime))
 
 
 if __name__ == "__main__":
