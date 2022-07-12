@@ -5,3 +5,4 @@ shadows_model/testing/__pycache__/
 shadows_model/testing/test_data/input/*
 shadows_model/testing/test_data/output/*
 Anaconda3-2022.05-Linux-x86_64.sh
+shadows_model/testing/.nfs*

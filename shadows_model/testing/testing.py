@@ -2,7 +2,7 @@ import pickle
 import gtsrb
 import torch
 from torchvision import transforms
-from torch.utils.data import DataLoader, Dataset, ConcatDataset
+from torch.utils.data import DataLoader, Dataset, ConcatDataset, SubsetRandomSampler
 import torch.nn as nn
 from utils import judge_mask_type
 from utils import brightness
@@ -459,24 +459,33 @@ def train_model():
         images, labels = train_data["data"], train_data["labels"]
 
     datasets = []
-    for trans, adv in [(False, False), (True, True), (True, False), (False, True)]:
+    for trans, adv in tqdm([(False, False), (True, True), (True, False), (False, True)]):
         datasets.append(RegimeTwoDataset(images, labels, transform=trans, use_adv=adv))
     dataset_train = ConcatDataset(datasets)
-    dataloader_train = DataLoader(dataset_train, batch_size=64, shuffle=False)
+
+    num_train = len(dataset_train)
+    indices = list(range(num_train))
+    np.random.shuffle(indices)
+    split = int(np.floor(0.4 * num_train))
+    train_idx = indices[:split]
+    train_sampler = SubsetRandomSampler(train_idx)
+
+    dataloader_train = DataLoader(dataset_train, batch_size=64, sampler=train_sampler)
 
     print("******** I'm training the Regime Two Model Now! *****")
-    num_epoch = 15
+    num_epoch = 10
     training_model = RegimeTwoCNN().to(DEVICE).apply(gtsrb.weights_init)
     optimizer = torch.optim.Adam(
         training_model.parameters(), lr=0.001, weight_decay=1e-5
     )
     training_model = training_model.double()
-    for _ in range(num_epoch):
+    for epoch in range(num_epoch):
         # epoch_start = time.time()
+        print("NOW AT: Epoch {}".format(epoch))
         training_model.train()
         loss = acc = 0.0
 
-        for data_batch in dataloader_train:
+        for data_batch in tqdm(dataloader_train):
             train_predict = training_model(data_batch[0].to(DEVICE))
             batch_loss = LOSS_FUN(train_predict, data_batch[1].to(DEVICE))
             batch_loss.backward()
@@ -484,12 +493,17 @@ def train_model():
             optimizer.zero_grad()
             acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
             loss += batch_loss.item() * len(data_batch[1])
-    # epoch_end = time.time()
-    print(
-        f"Train Acc: {round(float(acc / dataset_train.__len__()), 4)}",
-        end=" ",
-    )
-    print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end="\n")
+        # epoch_end = time.time()
+        print(
+            f"Train Acc: {round(float(acc / dataset_train.__len__()), 4)}",
+            end=" ",
+        )
+        print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end="\n")
+
+        torch.save(
+        training_model.state_dict(),
+        "./testing/regime_two_model_early{}".format(epoch),
+        )
 
     torch.save(
         training_model.state_dict(),
@@ -669,4 +683,5 @@ def main():
 
 
 if __name__ == "__main__":
+    print(DEVICE)
     main()
