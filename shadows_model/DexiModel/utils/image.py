@@ -111,13 +111,13 @@ def save_image_batch_to_disk(
             #     tmp_img2 = cv2.bitwise_not(tmp_img2)
 
             # Resize prediction to match input image size
-            # if not tmp_img.shape[1] == i_shape[0] or not tmp_img.shape[0] == i_shape[1]:
-            #     tmp_img = cv2.resize(tmp_img, (i_shape[0], i_shape[1]))
-            #     tmp_img2 = (
-            #         cv2.resize(tmp_img2, (i_shape[0], i_shape[1]))
-            #         if tmp2 is not None
-            #         else None
-            #     )
+            if not tmp_img.shape[1] == i_shape[0] or not tmp_img.shape[0] == i_shape[1]:
+                tmp_img = cv2.resize(tmp_img, (i_shape[0], i_shape[1]))
+                tmp_img2 = (
+                    cv2.resize(tmp_img2, (i_shape[0], i_shape[1]))
+                    if tmp2 is not None
+                    else None
+                )
 
             # if tmp2 is not None:
             #     tmp_mask = np.logical_and(tmp_img > 128, tmp_img2 < 128)

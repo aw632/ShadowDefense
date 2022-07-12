@@ -270,6 +270,14 @@ def image_normalization(img, img_min=0, img_max=255, epsilon=1e-12):
     return img
 
 
+def auto_canny(image, sigma=0.33):
+    v = np.median(image)
+    lower = int(max(0, (1.0 - sigma) * v))
+    upper = int(min(255, (1.0 + sigma) * v))
+    edged = cv2.Canny(image, lower, upper)
+    return edged
+
+
 class RegimeTwoDataset(Dataset):
     """RegimeTwoDataset is a dataset class that takes in adversarial images from input and
     edge profiles from output and returns a dataset of images and labels, where
@@ -338,55 +346,23 @@ class RegimeTwoDataset(Dataset):
         image = image / 255.0 - 0.5
         return image
 
-    def generate_single_edge_profile(self, img):
-        """Generates a single edge profile from the image."""
-        model = DexiNed().to(DEVICE)
-        model.load_state_dict(torch.load(DEXINED_MODEL, map_location=DEVICE))
-        model.eval()
-
-        with torch.no_grad():
-            img = img.to(DEVICE)
-            pred = model(img)
-            edge_maps = []
-            for i in pred:
-                tmp = torch.sigmoid(i).cpu().detach().numpy()
-                edge_maps.append(tmp)
-            tensor = np.array(edge_maps)
-            tmp = tensor[:, 0, ...]
-            tmp = np.squeeze(tmp)
-            for i in range(tmp.shape[0]):
-                tmp_img = tmp[i]
-                tmp_img = np.uint8(image_normalization(tmp_img))
-                tmp_img = cv2.bitwise_not(tmp_img)
-                if i == 6:
-                    fuse = tmp_img
-                    fuse = fuse.astype(np.uint8)
-        return fuse
-
     def __getitem__(self, idx):
         img, label = self.images[idx], self.labels[idx]
+        # resize image to 224 by 224
         if self.use_adv:  # make edge profiles of adversarial images
             mask_type = judge_mask_type("GTSRB", label)
             if brightness(img, MASK_LIST[mask_type]) >= 120:
                 img, _, _ = attack(img, label, POSITION_LIST[mask_type], testing=True)
-        if self.transform:
-            img = self.transform_img(img)
-        cv2.imwrite("./testing/test_data/input/{}_adv.png".format(idx), img)
-
+        # if self.transform:
+        #     img = self.transform_img(img)
+        cv2.imwrite("./testing/test_data/input/{}_{}_adv.png".format(idx, label), img)
+        #  #FOR DEBUGGING ONLY
         # add the edge profile
         transform = transforms.Compose([transforms.ToTensor()])
-
-        # image preprocessing
-        edge_img = img.copy()
-        edge_img = np.array(edge_img, dtype=np.float32)
-        edge_img -= [103.939, 116.779, 123.68, 137.86][0:3]
-        edge_img = edge_img.transpose((2, 0, 1))
-        edge_img = torch.from_numpy(edge_img.copy()).float()
-
-        edge_img = edge_img.unsqueeze(
-            0
-        )  # makes a batch of 1, because dexined model only accepts batches.
-        edge_profile = self.generate_single_edge_profile(edge_img)
+        edge_profile = auto_canny(img)
+        cv2.imwrite(
+            "./testing/test_data/output/{}_{}edge.png".format(idx, label), edge_profile
+        )  # FOR DEBUGGING ONLY
         edge_profile = transform(edge_profile)
         img = transform(img)
         img = torch.cat((img, edge_profile), dim=0)
@@ -407,7 +383,8 @@ class RegimeTwoCNN(nn.Module):
             nn.Conv2d(32, 32, (5, 5), stride=(1, 1), padding=2),
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
+            nn.BatchNorm2d(32),
+            nn.Dropout(p=0.4),
         )
         self.module2 = nn.Sequential(
             nn.Conv2d(32, 64, (5, 5), stride=(1, 1), padding=2),
@@ -415,7 +392,8 @@ class RegimeTwoCNN(nn.Module):
             nn.Conv2d(64, 64, (5, 5), stride=(1, 1), padding=2),
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
+            nn.BatchNorm2d(64),
+            nn.Dropout(p=0.4),
         )
         self.module3 = nn.Sequential(
             nn.Conv2d(64, 128, (5, 5), stride=(1, 1), padding=2),
@@ -423,7 +401,8 @@ class RegimeTwoCNN(nn.Module):
             nn.Conv2d(128, 128, (5, 5), stride=(1, 1), padding=2),
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
+            nn.BatchNorm2d(128),
+            nn.Dropout(p=0.4),
         )
         self.fc1 = nn.Sequential(
             nn.Linear(14336, 1024, bias=True), nn.ReLU(), nn.Dropout(p=0.5)
@@ -431,7 +410,7 @@ class RegimeTwoCNN(nn.Module):
         self.fc2 = nn.Sequential(
             nn.Linear(1024, 1024, bias=True),
             nn.ReLU(),
-            nn.Dropout(p=0.5),
+            nn.Dropout(p=0.4),
         )
         self.fc3 = nn.Linear(1024, 43, bias=True)
 
@@ -459,10 +438,13 @@ def train_model():
         images, labels = train_data["data"], train_data["labels"]
 
     datasets = []
-    for trans, adv in tqdm(
-        [(False, False), (True, True), (True, False), (False, True)]
-    ):
-        datasets.append(RegimeTwoDataset(images, labels, transform=trans, use_adv=adv))
+    # for trans, adv in tqdm(
+    #     [(False, False), (True, True), (True, False), (False, True)]
+    # ):
+    #     datasets.append(RegimeTwoDataset(images, labels, transform=trans, use_adv=adv))
+    datasets.append(
+        RegimeTwoDataset(images=images, labels=labels, transform=False, use_adv=True)
+    )
     dataset_train = ConcatDataset(datasets)
 
     num_train = len(dataset_train)
@@ -473,11 +455,11 @@ def train_model():
     train_sampler = SubsetRandomSampler(train_idx)
 
     dataloader_train = DataLoader(
-        dataset_train, batch_size=64, sampler=train_sampler, num_workers=6
+        dataset_train, batch_size=1, sampler=train_sampler, num_workers=6
     )
 
     print("******** I'm training the Regime Two Model Now! *****")
-    num_epoch = 10
+    num_epoch = 25
     training_model = RegimeTwoCNN().to(DEVICE).apply(gtsrb.weights_init)
     optimizer = torch.optim.Adam(
         training_model.parameters(), lr=0.001, weight_decay=1e-5
@@ -489,6 +471,7 @@ def train_model():
         training_model.train()
         loss = acc = 0.0
 
+        counter = 0
         for data_batch in tqdm(dataloader_train):
             train_predict = training_model(data_batch[0].to(DEVICE))
             batch_loss = LOSS_FUN(train_predict, data_batch[1].to(DEVICE))
@@ -497,12 +480,13 @@ def train_model():
             optimizer.zero_grad()
             acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
             loss += batch_loss.item() * len(data_batch[1])
+            counter += 1
         # epoch_end = time.time()
         print(
-            f"Train Acc: {round(float(acc / dataset_train.__len__()), 4)}",
+            f"Train Acc: {round(float(acc / counter), 4)}",
             end=" ",
         )
-        print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end="\n")
+        print(f"Loss: {round(float(loss / counter), 4)}", end="\n")
 
         torch.save(
             training_model.state_dict(),
@@ -687,6 +671,6 @@ def main():
 
 
 if __name__ == "__main__":
-    mp.set_start_method('spawn', force=True)
+    mp.set_start_method("spawn", force=True)
     print(DEVICE)
     main()
