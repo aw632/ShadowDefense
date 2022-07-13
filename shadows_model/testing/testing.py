@@ -145,14 +145,18 @@ class RegimeTwoDataset(Dataset):
 
     def __getitem__(self, idx):
         img, label = self.images[idx], self.labels[idx]
-        transform = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406, 0], std=[0.229, 0.224, 0.225, 1]),
-
-        ])
+        # transform = transforms.Compose(
+        #     [
+        #         transforms.ToPILImage(),
+        #         transforms.Resize(256),
+        #         transforms.CenterCrop(224),
+        #         transforms.ToTensor(),
+        #         transforms.Normalize(
+        #             mean=[0.485, 0.456, 0.406, 0.48], std=[0.229, 0.224, 0.225, 0.225]
+        #         ),
+        #     ]
+        # )
+        transform = transforms.Compose([transforms.ToTensor()])
         img = transform(img)
         return img, label
 
@@ -264,11 +268,16 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
                 )
                 img = shadow_edge_blur(shadow_image, shadow_area, 3)
         # always add edge profile
+        # FOR DEBUGGING
+        # cv2.imwrite(f"./testing/test_data/input/{idx}_original.png", img)
+        # img = preprocess_image_nchan(
+        #     img.astype(np.uint8), use4chan=False
+        # )  # improve contrast to help edge detection
+        blur = cv2.GaussianBlur(img, (3, 3), 0)
+        edge_profile = auto_canny(blur.copy().astype(np.uint8))
+        # DEBUGGING
+        # cv2.imwrite(f"./testing/test_data/output/{idx}_edge.png", edge_profile)
         transform = transforms.Compose([transforms.ToTensor()])
-        img = preprocess_image_nchan(
-            img.astype(np.uint8), use4chan=False
-        )  # improve contrast to help edge detection
-        edge_profile = auto_canny(img.copy().astype(np.uint8))
         edge_profile = transform(edge_profile)
         img = transform(img.copy())
         img = torch.cat((img, edge_profile), dim=0)
@@ -279,9 +288,7 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         img = torch.from_numpy(img.copy())
         return img
 
-    new_images = Parallel(n_jobs=6)(
-        delayed(func)(idx) for idx in tqdm(range(len(images)))
-    )
+    new_images = Parallel(n_jobs=6)(delayed(func)(idx) for idx in tqdm(range(100)))
     return new_images
 
 
@@ -292,21 +299,21 @@ def train_model():
 
     new_labels = torch.LongTensor(labels)
     datasets = []
-    for trans, adv in [(False, False), (True, True), (True, False), (False, True)]:
+    for trans, adv in [(False, False), (True, True), (False, True), (True, False)]:
         directory = "./testing/test_data/"
         filename = f"adv_{adv}_trans_{trans}_predrawn.pkl"
         full_path = f"{directory}{filename}"
-        if filename in listdir("./testing/test_data/"):
-            with open(full_path, "rb") as f:
-                new_images = pickle.load(f)
-        else:
-            new_images = predraw_shadows_and_edges(
-                images, new_labels, use_adv=adv, use_transform=trans
-            )
-            with open(full_path, "wb") as f:
-                print("Saving new_images")
-                pickle.dump(new_images, f)
-        datasets.append(RegimeTwoDataset(new_images, new_labels))
+        # if filename in listdir("./testing/test_data/"):
+        #     with open(full_path, "rb") as f:
+        #         new_images = pickle.load(f)
+        # else:
+        new_images = predraw_shadows_and_edges(
+            images, new_labels, use_adv=adv, use_transform=trans
+        )
+        with open(full_path, "wb") as f:
+            print("Saving new_images")
+            pickle.dump(new_images, f)
+    datasets.append(RegimeTwoDataset(new_images, new_labels))
     dataset_train = ConcatDataset(datasets)
 
     num_train = len(dataset_train)
@@ -321,29 +328,30 @@ def train_model():
 
     print("******** I'm training the Regime Two Model Now! *****")
     num_epoch = 15
-    training_model = torchvision.models.resnet50(
-        weights=torchvision.models.ResNet50_Weights.DEFAULT
-    ).to(DEVICE)
+    training_model = RegimeTwoCNN().to(DEVICE)
+    # training_model = torchvision.models.resnet50(
+    #     weights=torchvision.models.ResNet50_Weights.DEFAULT
+    # ).to(DEVICE)
 
-    # let ResNet accept 4 channels
-    first_layer_weights = training_model.conv1.weight.data.clone()
-    training_model.conv1 = nn.Conv2d(
-        4, 64, kernel_size=7, stride=2, padding=3, bias=False
-    )
-    with torch.no_grad():
-        training_model.conv1.weight.data[:, :3] = first_layer_weights
-        training_model.conv1.weight.data[:, 3] = first_layer_weights[:, 0]
-    training_model.conv1 = training_model.conv1.to(DEVICE)
+    # # let ResNet accept 4 channels
+    # first_layer_weights = training_model.conv1.weight.data.clone()
+    # training_model.conv1 = nn.Conv2d(
+    #     4, 64, kernel_size=7, stride=2, padding=3, bias=False
+    # )
+    # with torch.no_grad():
+    #     training_model.conv1.weight.data[:, :3] = first_layer_weights
+    #     training_model.conv1.weight.data[:, 3] = first_layer_weights[:, 0]  # ?
+    # training_model.conv1 = training_model.conv1.to(DEVICE)
 
-    # let ResNet output 43 neurons for GTSRB
-    # block.expansion for ResNet 18 is 4, so 512 * block.expansion = 2048.
-    training_model.fc = nn.Linear(512 * 4, N_CLASS)
-    training_model.fc = training_model.fc.to(DEVICE)
+    # # let ResNet output 43 neurons for GTSRB
+    # # block.expansion for ResNet 18 is 4, so 512 * block.expansion = 2048.
+    # training_model.fc = nn.Linear(512 * 4, N_CLASS)
+    # training_model.fc = training_model.fc.to(DEVICE)
     training_model = training_model.to(torch.float)
 
     # use momentum optimiezer
     optimizer = torch.optim.Adam(
-        training_model.parameters(), lr=0.01, weight_decay=1e-5
+        training_model.parameters(), lr=0.001, weight_decay=1e-5
     )
     for epoch in range(num_epoch):
         # epoch_start = time.time()
@@ -481,4 +489,6 @@ if __name__ == "__main__":
     #     train_data = pickle.load(dataset)
     #     images, labels = train_data["data"], train_data["labels"]
 
-    # new_images = predraw_shadows_and_edges(images, torch.LongTensor(labels), True, True)
+    # new_images = predraw_shadows_and_edges(
+    #     images, torch.LongTensor(labels), False, False
+    # )
