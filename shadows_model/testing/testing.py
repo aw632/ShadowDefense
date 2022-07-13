@@ -640,4 +640,6 @@ if __name__ == "__main__":
     #     images, labels = train_data["data"], train_data["labels"]
 
     # new_images = predraw_shadows_and_edges(images, torch.LongTensor(labels), True, True)
-    # print(len(new_images))
+    # with open("./testing/test_data/adv_True_trans_True_predrawn.pkl", "wb") as f:
+    #     print("Saving new_images")
+    #     pickle.dump(new_images, f)
