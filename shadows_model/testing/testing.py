@@ -20,6 +20,8 @@ from os import listdir
 from os.path import isfile, join
 import numpy as np
 import subprocess
+from joblib import Parallel, delayed
+
 
 # BEGIN GLOBALS
 REGIME_ONE_MODEL = "model/model_gtsrb.pth"
@@ -477,8 +479,8 @@ def transform_img(image):
 
 
 def predraw_shadows_and_edges(images, labels, use_adv, transform):
-    images = []
-    for idx in tqdm(range(len(images))):
+    
+    def func(idx):
         img, label = images[idx], labels[idx]
         mask_type = judge_mask_type("GTSRB", label)
         if use_adv:  # if use_adv is True, then make adversarial images
@@ -495,9 +497,10 @@ def predraw_shadows_and_edges(images, labels, use_adv, transform):
             img = transform_img(img)
         img = preprocess_image(img.astype(np.uint8))
         img = torch.from_numpy(img)
-        images.append(img)
-
-    return images
+        return img
+    
+    new_images = Parallel(n_jobs=6)(delayed(func)(idx) for idx in range(len(images)))
+    return new_images
 
 
 def train_model():
@@ -514,6 +517,7 @@ def train_model():
         with open(
             f"./testing/test_data/adv_{adv}_trans_{trans}_predrawn.pkl", "wb"
         ) as f:
+            print("Saving new_images")
             pickle.dump(new_images, f)
         datasets.append(RegimeTwoDataset(new_images, new_labels))
     # datasets.append(
@@ -522,6 +526,7 @@ def train_model():
     dataset_train = ConcatDataset(datasets)
 
     num_train = len(dataset_train)
+    print("There are {} examples in the dataset".format(num_train))
     indices = list(range(num_train))
     np.random.shuffle(indices)
     split = int(np.floor(0.3 * num_train))
@@ -571,62 +576,6 @@ def train_model():
         training_model.state_dict(),
         REGIME_TWO_MODEL,
     )
-
-
-# def train_model():
-#     """Train model trains the GtsrbCNN on the Regime 2 dataset."""
-#     # generate adversarial images
-#     with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
-#         train_data = pickle.load(dataset)
-#         images, labels = train_data["data"], train_data["labels"]
-
-#     _, _ = generate_adv_images(images, labels)
-#     # push the images through the edge profiler
-#     generate_edge_profiles(32, 32)
-#     # we want 32 x 32 edge profiles, greyscale, so we can add as a channel
-#     dataset_train_without_augmentations = RegimeTwoDataset(
-#         input=INPUT_DIR, output=OUTPUT_DIR, transform=False
-#     )
-#     dataset_train_with_augmentations = RegimeTwoDataset(
-#         input=INPUT_DIR, output=OUTPUT_DIR, transform=True
-#     )
-#     dataset_train = ConcatDataset(
-#         [dataset_train_without_augmentations, dataset_train_with_augmentations]
-#     )
-#     dataloader_train = DataLoader(dataset_train, batch_size=64, shuffle=False)
-
-#     print("******** I'm training the Regime Two Model Now! *****")
-#     num_epoch = 15
-#     training_model = RegimeTwoCNN().to(DEVICE).apply(gtsrb.weights_init)
-#     optimizer = torch.optim.Adam(
-#         training_model.parameters(), lr=0.001, weight_decay=1e-5
-#     )
-#     training_model = training_model.double()
-#     for _ in range(num_epoch):
-#         # epoch_start = time.time()
-#         training_model.train()
-#         loss = acc = 0.0
-
-#         for data_batch in dataloader_train:
-#             train_predict = training_model(data_batch[0].to(DEVICE))
-#             batch_loss = LOSS_FUN(train_predict, data_batch[1].to(DEVICE))
-#             batch_loss.backward()
-#             optimizer.step()
-#             optimizer.zero_grad()
-#             acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
-#             loss += batch_loss.item() * len(data_batch[1])
-#         # epoch_end = time.time()
-#         print(
-#             f"Train Acc: {round(float(acc / dataset_train.__len__()), 4)}",
-#             end=" ",
-#         )
-#         print(f"Loss: {round(float(loss / dataset_train.__len__()), 4)}", end="\n")
-
-#     torch.save(
-#         training_model.state_dict(),
-#         REGIME_TWO_MODEL,
-#     )
-
 
 def regime_two_a(out_file):
     """See instructions.md
@@ -745,6 +694,11 @@ def main():
 
 
 if __name__ == "__main__":
-    mp.set_start_method("spawn", force=True)
-    print(DEVICE)
-    main()
+    # mp.set_start_method("spawn", force=True)
+    # main()
+    with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
+        train_data = pickle.load(dataset)
+        images, labels = train_data["data"], train_data["labels"]
+    
+    new_images = predraw_shadows_and_edges(images, torch.LongTensor(labels), False, False)
+    print(len(new_images))
