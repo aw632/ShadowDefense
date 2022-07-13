@@ -379,7 +379,7 @@ def train_model():
     train_sampler = SubsetRandomSampler(train_idx)
 
     dataloader_train = DataLoader(
-        dataset_train, batch_size=64, sampler=train_sampler, num_workers=6
+        dataset_train, batch_size=64, sampler=train_sampler
     )
 
     print("******** I'm training the Regime Two Model Now! *****")
