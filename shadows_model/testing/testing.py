@@ -21,6 +21,7 @@ from os.path import isfile, join
 import numpy as np
 import subprocess
 from joblib import Parallel, delayed
+import torchvision.models
 
 
 # BEGIN GLOBALS
@@ -30,128 +31,48 @@ REGIME_ONE_MODEL = "model/model_gtsrb.pth"
 # )
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 POSITION_LIST, MASK_LIST = load_mask()
-INPUT_DIR = "testing/test_data/input"
-OUTPUT_DIR = "testing/test_data/output"
+# INPUT_DIR = "testing/test_data/input"
+# OUTPUT_DIR = "testing/test_data/output"
 N_CLASS = 43  # 43 classes in GTSRB
 REGIME_TWO_MODEL = "./testing/regime_two_model.pth"
 DEXINED_MODEL = "./DexiModel/10_model.pth"
 LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
 
 
-def generate_adv_images(images, labels):
-    """Generates adversarial images by applying an artificial geometric shadow.
-    See "Shadows Can Be Dangerous" paper by Zhong et al, 2022 for more details.
-
-    Args:
-        images (array of tensors): array of 3 channel RGB tensors representing images.
-        labels : class labels for each image in images.
-
-    Returns:
-        success_no_edges (int): number of images that were successfully attacked.
-        total_num_images (int): total number of images in images.
-    """
-    success_no_edges = 0
-    total_num_images = 0
-    # for index in tqdm(range(len(images))):
-    for index in range(1):
-        mask_type = judge_mask_type("GTSRB", labels[index])
-        if brightness(images[index], MASK_LIST[mask_type]) >= 120:
-            adv_img, success, _ = attack(
-                images[index], labels[index], POSITION_LIST[mask_type], testing=True
-            )
-            success_no_edges += success
-            total_num_images += 1
-            cv2.imwrite(
-                f"{INPUT_DIR}/{index}_{labels[index]}_{success}.png",
-                adv_img,
-            )
-    print("******** Finished Generating Adversarial Images. *****")
-    return success_no_edges, total_num_images
-
-
-def generate_edge_profiles(width, height):
-    """Generates edge profiles using DexiNed model. Outputs the edge profiles into
-    OUPUT_DIR.
-
-    Args:
-        width (int): width of the edge profile in pixels
-        height (int): height of the edge profile in pixels
-    """
-    dataset_val = TestDataset(
-        INPUT_DIR,
-        test_data="CLASSIC",
-        img_width=width,
-        img_height=height,
-        mean_bgr=[103.939, 116.779, 123.68, 137.86][0:3],
-        test_list=None,
-        arg=None,
-        # arg not needed since test_data = CLASSIC
-    )
-    dataloader_val = DataLoader(dataset_val, batch_size=1, shuffle=False)
-
-    deximodel = DexiNed().to(DEVICE)
-    print("******** Starting Testing. *****")
-    dnm.test(
-        "10_model.pth",
-        dataloader_val,
-        deximodel,
-        DEVICE,
-        OUTPUT_DIR,
-    )
-
-
-def evaluate_edge_profiles():
-    success_with_edges = 0
-    confidence_with_edges = 0
-    total_num_images = 0
-    for file in tqdm(listdir(OUTPUT_DIR)):
-        path = join(OUTPUT_DIR, file)
-        if isfile(path):
-            # extract the string between the first and second underscore in file
-            # and convert it to an integer
-            label = int(file.split("_")[1])
-            _, success, confidence = gtsrb.test_single_image(path, label)
-            success_with_edges += (
-                success  # note, success here refers to a successful classification
-            )
-            confidence_with_edges += confidence
-            total_num_images += 1
-
-    return success_with_edges, confidence_with_edges, total_num_images
-
-
 def regime_one(out_file):
     # load file from REGIME_ONE_MODEL and store in variable "model"
-    model = gtsrb.GtsrbCNN(N_CLASS).to(DEVICE)
-    model.load_state_dict(
-        torch.load(
-            REGIME_ONE_MODEL,
-            map_location=DEVICE,
-        )
-    )
-    # pre_process = transforms.Compose([pre_process_image, transforms.ToTensor()])
-    model.eval()  # set the model in evaluation mode
+    # model = gtsrb.GtsrbCNN(N_CLASS).to(DEVICE)
+    # model.load_state_dict(
+    #     torch.load(
+    #         REGIME_ONE_MODEL,
+    #         map_location=DEVICE,
+    #     )
+    # )
+    # # pre_process = transforms.Compose([pre_process_image, transforms.ToTensor()])
+    # model.eval()  # set the model in evaluation mode
 
-    # generate the adversarial images by calling shadow_attack
-    # note: the images are saved irregardless of the success of the attack
-    with open("./dataset/GTSRB/test.pkl", "rb") as dataset:
-        test_data = pickle.load(dataset)
-        images, labels = test_data["data"], test_data["labels"]
+    # # generate the adversarial images by calling shadow_attack
+    # # note: the images are saved irregardless of the success of the attack
+    # with open("./dataset/GTSRB/test.pkl", "rb") as dataset:
+    #     test_data = pickle.load(dataset)
+    #     images, labels = test_data["data"], test_data["labels"]
 
-    results = {}
-    success_no_edges, total_num_images = generate_adv_images(images, labels)
-    # push the images through the edge profiler
-    generate_edge_profiles(512, 512)
-    # test it on the model using "test_single_image"
-    success_with_edges, confidence_with_edges, _ = evaluate_edge_profiles()
+    # results = {}
+    # success_no_edges, total_num_images = generate_adv_images(images, labels)
+    # # push the images through the edge profiler
+    # generate_edge_profiles(512, 512)
+    # # test it on the model using "test_single_image"
+    # success_with_edges, confidence_with_edges, _ = evaluate_edge_profiles()
 
-    # robustness = 1 - success of attacks
-    results["robustness_no_edges"] = 1 - (success_no_edges / total_num_images)
-    results["robustness_with_edges"] = success_with_edges / total_num_images
-    results["confidence_with_edges"] = confidence_with_edges / total_num_images
-    # save the results to out_file
-    with open(out_file, "w") as f:
-        json.dump(results, f)
+    # # robustness = 1 - success of attacks
+    # results["robustness_no_edges"] = 1 - (success_no_edges / total_num_images)
+    # results["robustness_with_edges"] = success_with_edges / total_num_images
+    # results["confidence_with_edges"] = confidence_with_edges / total_num_images
+    # # save the results to out_file
+    # with open(out_file, "w") as f:
+    #     json.dump(results, f)
+    # raise deprecated error
+    raise DeprecationWarning("This regime is deprecated. Use another regime instead.")
 
 
 def image_normalization(img, img_min=0, img_max=255, epsilon=1e-12):
@@ -182,14 +103,16 @@ def auto_canny(image, sigma=0.33):
     return edged
 
 
-def preprocess_image(image):
+def preprocess_image_nchan(image, use4chan):
     """Preprocess the image. same as the paper author's but accounts for the
     4th channel.
     """
-    image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
-    image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
-    image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
-    image[:, :, 3] = cv2.equalizeHist(image[:, :, 3])
+    if not use4chan:
+        image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
+        image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
+        image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
+    if use4chan:
+        image[:, :, 3] = cv2.equalizeHist(image[:, :, 3])
     image = image / 255.0 - 0.5
     return image
 
@@ -222,6 +145,8 @@ class RegimeTwoDataset(Dataset):
 
     def __getitem__(self, idx):
         img, label = self.images[idx], self.labels[idx]
+        transform = torchvision.models.ResNet18_Weights.DEFAULT.transforms
+        img = transform(img)
         return img, label
 
 
@@ -265,7 +190,7 @@ class RegimeTwoCNN(nn.Module):
             nn.ReLU(),
             nn.Dropout(p=0.3),
         )
-        self.fc3 = nn.Linear(1024, 43, bias=True)
+        self.fc3 = nn.Linear(1024, N_CLASS, bias=True)
 
     def forward(self, x):
 
@@ -333,6 +258,9 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
                 img = shadow_edge_blur(shadow_image, shadow_area, 3)
         # always add edge profile
         transform = transforms.Compose([transforms.ToTensor()])
+        img = preprocess_image_nchan(
+            img.astype(np.uint8), use4chan=False
+        )  # improve contrast to help edge detection
         edge_profile = auto_canny(img.copy())
         edge_profile = transform(edge_profile)
         img = transform(img.copy())
@@ -340,11 +268,13 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         img = img.numpy()
         if use_transform:
             img = transform_img(img)
-        img = preprocess_image(img.astype(np.uint8))
+        img = preprocess_image_nchan(img.astype(np.uint8), use4chan=True)
         img = torch.from_numpy(img.copy())
         return img
 
-    new_images = Parallel(n_jobs=6)(delayed(func)(idx) for idx in tqdm(range(len(images))))
+    new_images = Parallel(n_jobs=6)(
+        delayed(func)(idx) for idx in tqdm(range(len(images)))
+    )
     return new_images
 
 
@@ -356,35 +286,52 @@ def train_model():
     new_labels = torch.LongTensor(labels)
     datasets = []
     for trans, adv in [(False, False), (True, True), (True, False), (False, True)]:
-        new_images = predraw_shadows_and_edges(
-            images, new_labels, use_adv=adv, use_transform=trans
-        )
-        with open(
-            f"./testing/test_data/adv_{adv}_trans_{trans}_predrawn.pkl", "wb"
-        ) as f:
-            print("Saving new_images")
-            pickle.dump(new_images, f)
+        filename = f"./testing/test_data/adv_{adv}_trans_{trans}_predrawn.pkl"
+        if filename in listdir("./testing/test_data/"):
+            with open(filename, "rb") as f:
+                new_images = pickle.load(f)
+        else:
+            new_images = predraw_shadows_and_edges(
+                images, new_labels, use_adv=adv, use_transform=trans
+            )
+            with open(filename, "wb") as f:
+                print("Saving new_images")
+                pickle.dump(new_images, f)
         datasets.append(RegimeTwoDataset(new_images, new_labels))
-    # datasets.append(
-    #     RegimeTwoDataset(images=images, labels=labels, transform=False, use_adv=True)
-    # )
     dataset_train = ConcatDataset(datasets)
 
     num_train = len(dataset_train)
     print("There are {} examples in the dataset".format(num_train))
     indices = list(range(num_train))
     np.random.shuffle(indices)
-    split = int(np.floor(0.3 * num_train))
+    split = int(np.floor(0.4 * num_train))
     train_idx = indices[:split]
     train_sampler = SubsetRandomSampler(train_idx)
 
-    dataloader_train = DataLoader(
-        dataset_train, batch_size=64, sampler=train_sampler
-    )
+    dataloader_train = DataLoader(dataset_train, batch_size=64, sampler=train_sampler)
 
     print("******** I'm training the Regime Two Model Now! *****")
     num_epoch = 15
-    training_model = RegimeTwoCNN().to(DEVICE).apply(gtsrb.weights_init)
+    training_model = torchvision.models.resnet18(
+        weights=torchvision.models.ResNet18_Weights.DEFAULT
+    ).to(DEVICE)
+
+    # let ResNet accept 4 channels
+    first_layer_weights = training_model.conv1.weight.data.clone()
+    training_model.conv1 = nn.Conv2d(
+        4, 64, kernel_size=7, stride=2, padding=3, bias=False
+    )
+    with torch.no_grad():
+        training_model.conv1.weight.data[:, :3] = first_layer_weights
+        training_model.conv1.weight.data[:, 3] = first_layer_weights[:, 0]
+    training_model.conv1 = training_model.conv1.to(DEVICE)
+
+    # let ResNet output 43 neurons for GTSRB
+    # block.expansion for ResNet 18 is 1, so 512 * block.expansion = 512.
+    training_model.fc = nn.Linear(512, N_CLASS)
+    training_model.fc = training_model.fc.to(DEVICE)
+
+    # use momentum optimiezer
     optimizer = torch.optim.Adam(
         training_model.parameters(), lr=0.01, weight_decay=1e-5
     )
@@ -411,11 +358,6 @@ def train_model():
             end=" ",
         )
         print(f"Loss: {round(float(loss / counter), 4)}", end="\n")
-
-        torch.save(
-            training_model.state_dict(),
-            "./testing/regime_two_model_early{}".format(epoch),
-        )
 
     torch.save(
         training_model.state_dict(),
@@ -489,23 +431,7 @@ def regime_two_b(out_file, fresh_start=False):
     )
     model.eval()
 
-    with open("./dataset/GTSRB/test.pkl", "rb") as dataset:
-        test_data = pickle.load(dataset)
-        images, labels = test_data["data"], test_data["labels"]
-
-    generate_adv_images(images, labels)
-    generate_edge_profiles(32, 32)
-    (
-        success_with_edges,
-        confidence_with_edges,
-        total_num_images,
-    ) = evaluate_edge_profiles()
-    results = {}
-    results["robustness_with_edges"] = success_with_edges / total_num_images
-    results["confidence_with_edges"] = confidence_with_edges / total_num_images
-    # save the results to out_file
-    with open(out_file, "w") as f:
-        json.dump(results, f)
+    raise NotImplementedError("Regime Two B is not implemented yet")
 
 
 def test(regime, out_file):
