@@ -344,7 +344,7 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         img = torch.from_numpy(img.copy())
         return img
 
-    new_images = Parallel(n_jobs=6)(delayed(func)(idx) for idx in tqdm(range(1)))
+    new_images = Parallel(n_jobs=6)(delayed(func)(idx) for idx in tqdm(range(len(images))))
     return new_images
 
 
@@ -540,10 +540,10 @@ def main():
 
 
 if __name__ == "__main__":
-    # mp.set_start_method("spawn", force=True)
-    # main()
-    with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
-        train_data = pickle.load(dataset)
-        images, labels = train_data["data"], train_data["labels"]
+    mp.set_start_method("spawn", force=True)
+    main()
+    # with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
+    #     train_data = pickle.load(dataset)
+    #     images, labels = train_data["data"], train_data["labels"]
 
-    new_images = predraw_shadows_and_edges(images, torch.LongTensor(labels), True, True)
+    # new_images = predraw_shadows_and_edges(images, torch.LongTensor(labels), True, True)
