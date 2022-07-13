@@ -144,9 +144,9 @@ class RegimeTwoCNN(nn.Module):
     def __init__(self):
 
         super().__init__()
-        self.color_map = nn.Conv2d(3, 3, (1, 1), stride=(1, 1), padding=0)
+        self.color_map = nn.Conv2d(4, 4, (1, 1), stride=(1, 1), padding=0)
         self.module1 = nn.Sequential(
-            nn.Conv2d(3, 32, (5, 5), stride=(1, 1), padding=2),
+            nn.Conv2d(4, 32, (5, 5), stride=(1, 1), padding=2),
             nn.ReLU(),
             nn.Conv2d(32, 32, (5, 5), stride=(1, 1), padding=2),
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
@@ -295,7 +295,7 @@ def train_model():
     num_train = len(dataset_train)
     indices = list(range(num_train))
     np.random.shuffle(indices)
-    split = int(np.floor(0.4 * num_train))
+    split = int(np.floor(1 * num_train))
     train_idx = indices[:split]
     real_num = len(train_idx)
     train_sampler = SubsetRandomSampler(train_idx)
