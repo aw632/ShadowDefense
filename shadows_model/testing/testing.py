@@ -252,8 +252,8 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         edge_profile = auto_canny(blur.copy().astype(np.uint8))
         # # DEBUGGING
         # # cv2.imwrite(f"./testing/test_data/output/{idx}_edge.png", edge_profile)
-        edge_profile = transform(edge_profile)
-        img = torch.cat((img, edge_profile), dim=0)
+        edge_profile = edge_profile[..., np.newaxis]
+        img = np.concatenate((img, edge_profile), axis=2)
         if use_transform:
             # for _ in range(10):
             img = transform_img(
@@ -338,7 +338,7 @@ def train_model():
         training_model.train()
         loss = acc = 0.0
 
-        num_sample = 0 
+        num_sample = 0
         for data_batch in tqdm(dataloader_train):
             train_predict = training_model(data_batch[0].to(DEVICE))
             batch_loss = LOSS_FUN(train_predict, data_batch[1].to(DEVICE))
@@ -462,12 +462,12 @@ def main():
 
 
 if __name__ == "__main__":
-    mp.set_start_method("spawn", force=True)
-    main()
-    # with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
-    #     train_data = pickle.load(dataset)
-    #     images, labels = train_data["data"], train_data["labels"]
+    # mp.set_start_method("spawn", force=True)
+    # main()
+    with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
+        train_data = pickle.load(dataset)
+        images, labels = train_data["data"], train_data["labels"]
 
-    # new_images = predraw_shadows_and_edges(
-    #     images, torch.LongTensor(labels), False, False
-    # )
+    new_images = predraw_shadows_and_edges(
+        images, torch.LongTensor(labels), False, False
+    )
