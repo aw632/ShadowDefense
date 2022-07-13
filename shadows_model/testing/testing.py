@@ -321,8 +321,8 @@ def train_model():
 
     print("******** I'm training the Regime Two Model Now! *****")
     num_epoch = 15
-    training_model = torchvision.models.resnet18(
-        weights=torchvision.models.ResNet18_Weights.DEFAULT
+    training_model = torchvision.models.resnet50(
+        weights=torchvision.models.ResNet50_Weights.DEFAULT
     ).to(DEVICE)
 
     # let ResNet accept 4 channels
@@ -336,8 +336,8 @@ def train_model():
     training_model.conv1 = training_model.conv1.to(DEVICE)
 
     # let ResNet output 43 neurons for GTSRB
-    # block.expansion for ResNet 18 is 1, so 512 * block.expansion = 512.
-    training_model.fc = nn.Linear(512, N_CLASS)
+    # block.expansion for ResNet 18 is 4, so 512 * block.expansion = 2048.
+    training_model.fc = nn.Linear(512 * 4, N_CLASS)
     training_model.fc = training_model.fc.to(DEVICE)
     training_model = training_model.to(torch.float)
 
