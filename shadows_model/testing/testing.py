@@ -462,12 +462,12 @@ def main():
 
 
 if __name__ == "__main__":
-    # mp.set_start_method("spawn", force=True)
-    # main()
-    with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
-        train_data = pickle.load(dataset)
-        images, labels = train_data["data"], train_data["labels"]
+    mp.set_start_method("spawn", force=True)
+    main()
+    # with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
+    #     train_data = pickle.load(dataset)
+    #     images, labels = train_data["data"], train_data["labels"]
 
-    new_images = predraw_shadows_and_edges(
-        images, torch.LongTensor(labels), False, False
-    )
+    # new_images = predraw_shadows_and_edges(
+    #     images, torch.LongTensor(labels), False, False
+    # )
