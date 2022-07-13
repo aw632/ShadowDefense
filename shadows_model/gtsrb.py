@@ -134,6 +134,8 @@ def transform_image(image, ang_range, shear_range, trans_range, preprocess):
 
     image = pre_process_image(image) if preprocess else image
 
+    print("NOW TRANSFORM")
+    print(image)
     return image
 
 
@@ -282,18 +284,18 @@ def train_model(adv_train=False, regime_train=False, dataloader=None):
         print("data loaded!")
         processed_train = (
             np.array(
-                [pre_process_image(train_data[i]) for i in range(len(train_data))],
+                [pre_process_image(train_data[i]) for i in range(1)],
                 dtype=np.float32,
             )
             if not adv_train
             else train_data
         )
         processed_test = np.array(
-            [pre_process_image(test_data[i]) for i in range(len(test_data))],
+            [pre_process_image(test_data[i]) for i in range(1)],
             dtype=np.float32,
         )
         augment_data_train, augment_data_labels = gen_extra_data(
-            train_data, train_labels, 10, 30, 5, 5, 1, preprocess=not adv_train
+            train_data, train_labels, 10, 30, 5, 5, 0, preprocess=not adv_train
         )
 
         image_train = np.concatenate([processed_train, augment_data_train], 0)
@@ -367,10 +369,10 @@ def test_single_image(img_path, label, adv_model=False):
 if __name__ == "__main__":
 
     # model training
-    # train_model(adv_train=True)
+    train_model(adv_train=False)
 
     # # model testing
     # test_model(adv_model=True)
 
     # test a single image
-    test_single_image("./test/edge_gtsrb_30.png", 1, adv_model=False)
+    # test_single_image("./test/edge_gtsrb_30.png", 1, adv_model=False)

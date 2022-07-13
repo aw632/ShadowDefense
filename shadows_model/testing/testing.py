@@ -75,7 +75,6 @@ def regime_one(out_file):
     raise DeprecationWarning("This regime is deprecated. Use another regime instead.")
 
 
-
 def auto_canny(image, sigma=0.33):
     v = np.median(image)
     lower = int(max(0, (1.0 - sigma) * v))
@@ -140,6 +139,7 @@ class RegimeTwoDataset(Dataset):
         img = img.float()
         return img, label
 
+
 class RegimeTwoCNN(nn.Module):
     def __init__(self):
 
@@ -197,12 +197,8 @@ class RegimeTwoCNN(nn.Module):
         return out
 
 
-def transform_img(image, preprocess):
-    """Applies several randomized transformations to image, including
-    shear, translation, and angle of rotation to improve robustness.
-    """
-    # magic numbers from the paper
-    ang_range, shear_range, trans_range = 30, 5, 5
+def transform_img(image, ang_range, shear_range, trans_range, preprocess):
+    # Rotation
     ang_rot = np.random.uniform(ang_range) - ang_range / 2
     rows, cols, ch = image.shape
     rot_m = cv2.getRotationMatrix2D((cols / 2, rows / 2), ang_rot, 1)
@@ -226,25 +222,26 @@ def transform_img(image, preprocess):
     image = cv2.warpAffine(image, trans_m, (cols, rows))
     image = cv2.warpAffine(image, shear_m, (cols, rows))
 
-    image = preprocess_image_nchan(image.astype(np.uint8)) if preprocess else image
+    image = preprocess_image_nchan(image) if preprocess else image
 
     return image
 
 
 def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
-    def func(idx):
+    new_images = []
+    for idx in tqdm(range(len(images))):
         img, label = images[idx], labels[idx]
         if use_adv:  # if use_adv is True, then make adversarial images
             mask_type = judge_mask_type("GTSRB", label)
-            if brightness(img, MASK_LIST[mask_type]) >= 120:
-                pos_list = POSITION_LIST[mask_type]
-                shadow_image, shadow_area = draw_shadow(
-                    np.random.uniform(-16, 48, 6),
-                    img,
-                    pos_list,
-                    np.random.uniform(0.2, 0.7),
-                )
-                img = shadow_edge_blur(shadow_image, shadow_area, 3)
+            # if brightness(img, MASK_LIST[mask_type]) >= 120:
+            pos_list = POSITION_LIST[mask_type]
+            shadow_image, shadow_area = draw_shadow(
+                np.random.uniform(-16, 48, 6),
+                img,
+                pos_list,
+                np.random.uniform(0.2, 0.7),
+            )
+            img = shadow_edge_blur(shadow_image, shadow_area, 3)
         # always add edge profile
         # FOR DEBUGGING
         # cv2.imwrite(f"./testing/test_data/input/{idx}_original.png", img)
@@ -255,19 +252,22 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         # edge_profile = auto_canny(blur.copy().astype(np.uint8))
         # # DEBUGGING
         # # cv2.imwrite(f"./testing/test_data/output/{idx}_edge.png", edge_profile)
-        transform = transforms.Compose([transforms.ToTensor()])
         # edge_profile = transform(edge_profile)
-        img = transform(img.copy())
         # img = torch.cat((img, edge_profile), dim=0)
-        img = img.numpy()
         if use_transform:
-            img = transform_img(img, preprocess=not use_adv)
+            # for _ in range(10):
+            img = transform_img(
+                image=img,
+                ang_range=30,
+                shear_range=5,
+                trans_range=5,
+                preprocess=not use_adv,
+            )
         else:
             img = preprocess_image_nchan(img.astype(np.uint8))
-        img = torch.from_numpy(img.copy())
-        return img
-
-    new_images = Parallel(n_jobs=6)(delayed(func)(idx) for idx in tqdm(range(len(images))))
+        transform = transforms.Compose([transforms.ToTensor()])
+        img = transform(img)
+        new_images.append(img)
     return new_images
 
 
@@ -278,14 +278,10 @@ def train_model():
 
     new_labels = torch.LongTensor(labels)
     datasets = []
-    for trans, adv in [(True, False)]:
+    for trans, adv in [(False, False)]:
         directory = "./testing/test_data/"
         filename = f"adv_{adv}_trans_{trans}_predrawn.pkl"
         full_path = f"{directory}{filename}"
-        # if filename in listdir("./testing/test_data/"):
-        #     with open(full_path, "rb") as f:
-        #         new_images = pickle.load(f)
-        # else:
         new_images = predraw_shadows_and_edges(
             images, new_labels, use_adv=adv, use_transform=trans
         )
@@ -301,14 +297,15 @@ def train_model():
     split = int(np.floor(0.4 * num_train))
     train_idx = indices[:split]
     train_sampler = SubsetRandomSampler(train_idx)
-    print(f"There are {num_train} examples in the dataset, and I am using {split} of them!")
-
+    print(
+        f"There are {num_train} examples in the dataset, and I am using {split} of them!"
+    )
 
     dataloader_train = DataLoader(dataset_train, batch_size=64, sampler=train_sampler)
 
     print("******** I'm training the Regime Two Model Now! *****")
     num_epoch = 25
-    training_model = gtsrb.GtsrbCNN(n_class=N_CLASS).to(DEVICE).apply(gtsrb.weights_init)
+    training_model = RegimeTwoCNN().to(DEVICE).apply(gtsrb.weights_init)
     # training_model = torchvision.models.resnet50(
     #     weights=torchvision.models.ResNet50_Weights.DEFAULT
     # ).to(DEVICE)
