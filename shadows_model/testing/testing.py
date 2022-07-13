@@ -273,14 +273,14 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         # img = preprocess_image_nchan(
         #     img.astype(np.uint8), use4chan=False
         # )  # improve contrast to help edge detection
-        blur = cv2.GaussianBlur(img, (3, 3), 0)
-        edge_profile = auto_canny(blur.copy().astype(np.uint8))
-        # DEBUGGING
-        # cv2.imwrite(f"./testing/test_data/output/{idx}_edge.png", edge_profile)
-        transform = transforms.Compose([transforms.ToTensor()])
-        edge_profile = transform(edge_profile)
-        img = transform(img.copy())
-        img = torch.cat((img, edge_profile), dim=0)
+        # blur = cv2.GaussianBlur(img, (3, 3), 0)
+        # edge_profile = auto_canny(blur.copy().astype(np.uint8))
+        # # DEBUGGING
+        # # cv2.imwrite(f"./testing/test_data/output/{idx}_edge.png", edge_profile)
+        # transform = transforms.Compose([transforms.ToTensor()])
+        # edge_profile = transform(edge_profile)
+        # img = transform(img.copy())
+        # img = torch.cat((img, edge_profile), dim=0)
         img = img.numpy()
         if use_transform:
             img = transform_img(img)
