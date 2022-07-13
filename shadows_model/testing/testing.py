@@ -145,7 +145,14 @@ class RegimeTwoDataset(Dataset):
 
     def __getitem__(self, idx):
         img, label = self.images[idx], self.labels[idx]
-        transform = torchvision.models.ResNet18_Weights.DEFAULT.transforms
+        transform = transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406, 0], std=[0.229, 0.224, 0.225, 1]),
+
+        ])
         img = transform(img)
         return img, label
 
@@ -261,7 +268,7 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         img = preprocess_image_nchan(
             img.astype(np.uint8), use4chan=False
         )  # improve contrast to help edge detection
-        edge_profile = auto_canny(img.copy())
+        edge_profile = auto_canny(img.copy().astype(np.uint8))
         edge_profile = transform(edge_profile)
         img = transform(img.copy())
         img = torch.cat((img, edge_profile), dim=0)
@@ -286,15 +293,17 @@ def train_model():
     new_labels = torch.LongTensor(labels)
     datasets = []
     for trans, adv in [(False, False), (True, True), (True, False), (False, True)]:
-        filename = f"./testing/test_data/adv_{adv}_trans_{trans}_predrawn.pkl"
+        directory = "./testing/test_data/"
+        filename = f"adv_{adv}_trans_{trans}_predrawn.pkl"
+        full_path = f"{directory}{filename}"
         if filename in listdir("./testing/test_data/"):
-            with open(filename, "rb") as f:
+            with open(full_path, "rb") as f:
                 new_images = pickle.load(f)
         else:
             new_images = predraw_shadows_and_edges(
                 images, new_labels, use_adv=adv, use_transform=trans
             )
-            with open(filename, "wb") as f:
+            with open(full_path, "wb") as f:
                 print("Saving new_images")
                 pickle.dump(new_images, f)
         datasets.append(RegimeTwoDataset(new_images, new_labels))
@@ -330,12 +339,12 @@ def train_model():
     # block.expansion for ResNet 18 is 1, so 512 * block.expansion = 512.
     training_model.fc = nn.Linear(512, N_CLASS)
     training_model.fc = training_model.fc.to(DEVICE)
+    training_model = training_model.to(torch.float)
 
     # use momentum optimiezer
     optimizer = torch.optim.Adam(
         training_model.parameters(), lr=0.01, weight_decay=1e-5
     )
-    training_model = training_model.double()
     for epoch in range(num_epoch):
         # epoch_start = time.time()
         print("NOW AT: Epoch {}".format(epoch))
