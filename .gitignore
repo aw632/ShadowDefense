@@ -8,3 +8,4 @@ Anaconda3-2022.05-Linux-x86_64.sh
 shadows_model/testing/.nfs*
 shadows_model/testing/regime_two_model_*
 DexiNed/
+shadows_model/testing/test_data/*.pkl
