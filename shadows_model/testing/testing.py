@@ -75,25 +75,6 @@ def regime_one(out_file):
     raise DeprecationWarning("This regime is deprecated. Use another regime instead.")
 
 
-def image_normalization(img, img_min=0, img_max=255, epsilon=1e-12):
-    """This is a typical image normalization function
-    where the minimum and maximum of the image is needed
-    source: https://en.wikipedia.org/wiki/Normalization_(image_processing)
-
-    :param img: an image could be gray scale or color
-    :param img_min:  for default is 0
-    :param img_max: for default is 255
-
-    :return: a normalized image, if max is 255 the dtype is uint8
-    """
-
-    img = np.float32(img)
-    # whenever an inconsistent image
-    img = (img - np.min(img)) * (img_max - img_min) / (
-        (np.max(img) - np.min(img)) + epsilon
-    ) + img_min
-    return img
-
 
 def auto_canny(image, sigma=0.33):
     v = np.median(image)
@@ -103,16 +84,14 @@ def auto_canny(image, sigma=0.33):
     return edged
 
 
-def preprocess_image_nchan(image, use4chan):
+def preprocess_image_nchan(image):
     """Preprocess the image. same as the paper author's but accounts for the
     4th channel.
     """
-    if not use4chan:
-        image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
-        image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
-        image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
-    if use4chan:
-        image[:, :, 3] = cv2.equalizeHist(image[:, :, 3])
+    image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
+    image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
+    image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
+    # image[:, :, 3] = cv2.equalizeHist(image[:, :, 3])
     image = image / 255.0 - 0.5
     return image
 
@@ -156,24 +135,23 @@ class RegimeTwoDataset(Dataset):
         #         ),
         #     ]
         # )
-        transform = transforms.Compose([transforms.ToTensor()])
-        img = transform(img)
+        # transform = transforms.Compose([transforms.ToTensor()])
+        # img = transform(img)
+        img = img.float()
         return img, label
-
 
 class RegimeTwoCNN(nn.Module):
     def __init__(self):
 
         super().__init__()
-        self.color_map = nn.Conv2d(4, 4, (1, 1), stride=(1, 1), padding=0)
+        self.color_map = nn.Conv2d(3, 3, (1, 1), stride=(1, 1), padding=0)
         self.module1 = nn.Sequential(
-            nn.Conv2d(4, 32, (5, 5), stride=(1, 1), padding=2),
+            nn.Conv2d(3, 32, (5, 5), stride=(1, 1), padding=2),
             nn.ReLU(),
             nn.Conv2d(32, 32, (5, 5), stride=(1, 1), padding=2),
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
             nn.ReLU(),
-            nn.BatchNorm2d(32),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=0.5),
         )
         self.module2 = nn.Sequential(
             nn.Conv2d(32, 64, (5, 5), stride=(1, 1), padding=2),
@@ -181,8 +159,7 @@ class RegimeTwoCNN(nn.Module):
             nn.Conv2d(64, 64, (5, 5), stride=(1, 1), padding=2),
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
             nn.ReLU(),
-            nn.BatchNorm2d(64),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=0.5),
         )
         self.module3 = nn.Sequential(
             nn.Conv2d(64, 128, (5, 5), stride=(1, 1), padding=2),
@@ -190,8 +167,7 @@ class RegimeTwoCNN(nn.Module):
             nn.Conv2d(128, 128, (5, 5), stride=(1, 1), padding=2),
             nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
             nn.ReLU(),
-            nn.BatchNorm2d(128),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=0.5),
         )
         self.fc1 = nn.Sequential(
             nn.Linear(14336, 1024, bias=True), nn.ReLU(), nn.Dropout(p=0.5)
@@ -199,7 +175,7 @@ class RegimeTwoCNN(nn.Module):
         self.fc2 = nn.Sequential(
             nn.Linear(1024, 1024, bias=True),
             nn.ReLU(),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=0.5),
         )
         self.fc3 = nn.Linear(1024, N_CLASS, bias=True)
 
@@ -221,7 +197,7 @@ class RegimeTwoCNN(nn.Module):
         return out
 
 
-def transform_img(image):
+def transform_img(image, preprocess):
     """Applies several randomized transformations to image, including
     shear, translation, and angle of rotation to improve robustness.
     """
@@ -250,6 +226,8 @@ def transform_img(image):
     image = cv2.warpAffine(image, trans_m, (cols, rows))
     image = cv2.warpAffine(image, shear_m, (cols, rows))
 
+    image = preprocess_image_nchan(image.astype(np.uint8)) if preprocess else image
+
     return image
 
 
@@ -277,18 +255,19 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         # edge_profile = auto_canny(blur.copy().astype(np.uint8))
         # # DEBUGGING
         # # cv2.imwrite(f"./testing/test_data/output/{idx}_edge.png", edge_profile)
-        # transform = transforms.Compose([transforms.ToTensor()])
+        transform = transforms.Compose([transforms.ToTensor()])
         # edge_profile = transform(edge_profile)
-        # img = transform(img.copy())
+        img = transform(img.copy())
         # img = torch.cat((img, edge_profile), dim=0)
         img = img.numpy()
         if use_transform:
-            img = transform_img(img)
-        img = preprocess_image_nchan(img.astype(np.uint8), use4chan=True)
+            img = transform_img(img, preprocess=not use_adv)
+        else:
+            img = preprocess_image_nchan(img.astype(np.uint8))
         img = torch.from_numpy(img.copy())
         return img
 
-    new_images = Parallel(n_jobs=6)(delayed(func)(idx) for idx in tqdm(range(100)))
+    new_images = Parallel(n_jobs=6)(delayed(func)(idx) for idx in tqdm(range(len(images))))
     return new_images
 
 
@@ -299,7 +278,7 @@ def train_model():
 
     new_labels = torch.LongTensor(labels)
     datasets = []
-    for trans, adv in [(False, False), (True, True), (False, True), (True, False)]:
+    for trans, adv in [(True, False)]:
         directory = "./testing/test_data/"
         filename = f"adv_{adv}_trans_{trans}_predrawn.pkl"
         full_path = f"{directory}{filename}"
@@ -313,22 +292,23 @@ def train_model():
         with open(full_path, "wb") as f:
             print("Saving new_images")
             pickle.dump(new_images, f)
-    datasets.append(RegimeTwoDataset(new_images, new_labels))
+        datasets.append(RegimeTwoDataset(new_images, new_labels))
     dataset_train = ConcatDataset(datasets)
 
     num_train = len(dataset_train)
-    print("There are {} examples in the dataset".format(num_train))
     indices = list(range(num_train))
     np.random.shuffle(indices)
     split = int(np.floor(0.4 * num_train))
     train_idx = indices[:split]
     train_sampler = SubsetRandomSampler(train_idx)
+    print(f"There are {num_train} examples in the dataset, and I am using {split} of them!")
+
 
     dataloader_train = DataLoader(dataset_train, batch_size=64, sampler=train_sampler)
 
     print("******** I'm training the Regime Two Model Now! *****")
-    num_epoch = 15
-    training_model = RegimeTwoCNN().to(DEVICE)
+    num_epoch = 25
+    training_model = gtsrb.GtsrbCNN(n_class=N_CLASS).to(DEVICE).apply(gtsrb.weights_init)
     # training_model = torchvision.models.resnet50(
     #     weights=torchvision.models.ResNet50_Weights.DEFAULT
     # ).to(DEVICE)
@@ -347,7 +327,7 @@ def train_model():
     # # block.expansion for ResNet 18 is 4, so 512 * block.expansion = 2048.
     # training_model.fc = nn.Linear(512 * 4, N_CLASS)
     # training_model.fc = training_model.fc.to(DEVICE)
-    training_model = training_model.to(torch.float)
+    # training_model = training_model.to(torch.float)
 
     # use momentum optimiezer
     optimizer = torch.optim.Adam(
