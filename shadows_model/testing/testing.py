@@ -7,7 +7,7 @@ import torch.multiprocessing as mp
 import torch.nn as nn
 from utils import judge_mask_type
 from utils import brightness
-from utils import load_mask
+from utils import load_mask, draw_shadow, shadow_edge_blur
 from utils import SmoothCrossEntropyLoss
 from shadow_attack import attack
 import DexiModel.main as dnm
@@ -152,104 +152,6 @@ def regime_one(out_file):
     # save the results to out_file
     with open(out_file, "w") as f:
         json.dump(results, f)
-
-
-# class RegimeTwoDataset(Dataset):
-#     """RegimeTwoDataset is a dataset class that takes in adversarial images from input and
-#     edge profiles from output and returns a dataset of images and labels, where
-#     images are adversarial images with edge profiles added as a channel.
-
-#     Args:
-#         Dataset (PyTorch Dataset): implements this superclass.
-#     """
-
-#     def __init__(self, input, output, transform):
-#         """Initializes the class.
-
-#         Args:
-#             input (str): Directory from which to load adversarial images.
-#             output (str): Directory from which to load edge profiles.
-#             transform (bool): Whether to apply transforms to the images. See
-#             transform_image function in the original paper's code.
-#         """
-#         super().__init__()
-#         input_files = [join(input, file) for file in listdir(input)]
-#         output_files = [join(output, file) for file in listdir(output)]
-#         assert len(input_files) == len(
-#             output_files
-#         ), "Must have the same number of input and output files"
-#         self.files = list(zip(input_files, output_files))
-#         self.transform = transform
-
-#     def __len__(self):
-#         return len(self.files)
-
-#     def transform_img(self, image):
-#         """Applies several randomized transformations to image, including
-#         shear, translation, and angle of rotation to improve robustness.
-#         """
-#         # magic numbers from the paper
-#         ang_range, shear_range, trans_range = 30, 5, 5
-#         ang_rot = np.random.uniform(ang_range) - ang_range / 2
-#         rows, cols, ch = image.shape
-#         rot_m = cv2.getRotationMatrix2D((cols / 2, rows / 2), ang_rot, 1)
-
-#         # Translation
-#         tr_x = trans_range * np.random.uniform() - trans_range / 2
-#         tr_y = trans_range * np.random.uniform() - trans_range / 2
-#         trans_m = np.float32([[1, 0, tr_x], [0, 1, tr_y]])
-
-#         # Shear
-#         pts1 = np.float32([[5, 5], [20, 5], [5, 20]])
-
-#         pt1 = 5 + shear_range * np.random.uniform() - shear_range / 2
-#         pt2 = 20 + shear_range * np.random.uniform() - shear_range / 2
-
-#         pts2 = np.float32([[pt1, 5], [pt2, pt1], [5, pt2]])
-
-#         shear_m = cv2.getAffineTransform(pts1, pts2)
-
-#         image = cv2.warpAffine(image, rot_m, (cols, rows))
-#         image = cv2.warpAffine(image, trans_m, (cols, rows))
-#         image = cv2.warpAffine(image, shear_m, (cols, rows))
-
-#         return image
-
-#     def preprocess_image(self, image):
-#         """Preprocess the image. same as the paper author's but accounts for the
-#         4th channel.
-#         """
-#         image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
-#         image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
-#         image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
-#         image[:, :, 3] = cv2.equalizeHist(image[:, :, 3])
-#         image = image / 255.0 - 0.5
-#         return image
-
-#     def __getitem__(self, idx):
-#         adv_image_path, edge_profile_path = self.files[idx]
-#         adv_image = cv2.imread(adv_image_path, cv2.IMREAD_COLOR)
-#         edge_profile = cv2.imread(edge_profile_path, cv2.IMREAD_GRAYSCALE)
-
-#         assert (
-#             adv_image.shape[0] == edge_profile.shape[0]
-#             and adv_image.shape[1] == edge_profile.shape[1]
-#         ), "Adv image and edge profile must be the same size"
-
-#         transform = transforms.Compose([transforms.ToTensor()])
-#         adv_image = transform(adv_image)
-#         edge_profile = transform(edge_profile)
-#         # dim 0 is the channels.
-#         img = torch.cat((adv_image, edge_profile), dim=0)
-#         img = img.numpy()
-#         img = self.preprocess_image(img.astype(np.uint8))
-#         if self.transform:
-#             img = self.transform_img(img)
-
-#         # image path looks like testing/test_data/output/<id>_<label>_<success>.png
-#         label = int(adv_image_path.split("_")[2])
-#         img = torch.from_numpy(img)
-#         return img, label
 
 
 def image_normalization(img, img_min=0, img_max=255, epsilon=1e-12):
@@ -421,7 +323,14 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         if use_adv:  # if use_adv is True, then make adversarial images
             mask_type = judge_mask_type("GTSRB", label)
             if brightness(img, MASK_LIST[mask_type]) >= 120:
-                img, _, _ = attack(img, label, POSITION_LIST[mask_type], testing=True)
+                pos_list = POSITION_LIST[mask_type]
+                shadow_image, shadow_area = draw_shadow(
+                    np.random.uniform(-16, 48, 6),
+                    img,
+                    pos_list,
+                    np.random.uniform(0.2, 0.7),
+                )
+                img = shadow_edge_blur(shadow_image, shadow_area, 3)
         # always add edge profile
         transform = transforms.Compose([transforms.ToTensor()])
         edge_profile = auto_canny(img.copy())
@@ -435,9 +344,7 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         img = torch.from_numpy(img.copy())
         return img
 
-    new_images = Parallel(n_jobs=6)(
-        delayed(func)(idx) for idx in tqdm(range(len(images)))
-    )
+    new_images = Parallel(n_jobs=6)(delayed(func)(idx) for idx in tqdm(range(1)))
     return new_images
 
 
@@ -633,13 +540,10 @@ def main():
 
 
 if __name__ == "__main__":
-    mp.set_start_method("spawn", force=True)
-    main()
-    # with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
-    #     train_data = pickle.load(dataset)
-    #     images, labels = train_data["data"], train_data["labels"]
+    # mp.set_start_method("spawn", force=True)
+    # main()
+    with open("./dataset/GTSRB/train.pkl", "rb") as dataset:
+        train_data = pickle.load(dataset)
+        images, labels = train_data["data"], train_data["labels"]
 
-    # new_images = predraw_shadows_and_edges(images, torch.LongTensor(labels), True, True)
-    # with open("./testing/test_data/adv_True_trans_True_predrawn.pkl", "wb") as f:
-    #     print("Saving new_images")
-    #     pickle.dump(new_images, f)
+    new_images = predraw_shadows_and_edges(images, torch.LongTensor(labels), True, True)
