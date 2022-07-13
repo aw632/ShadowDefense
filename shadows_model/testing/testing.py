@@ -248,12 +248,12 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         # img = preprocess_image_nchan(
         #     img.astype(np.uint8), use4chan=False
         # )  # improve contrast to help edge detection
-        # blur = cv2.GaussianBlur(img, (3, 3), 0)
-        # edge_profile = auto_canny(blur.copy().astype(np.uint8))
+        blur = cv2.GaussianBlur(img, (3, 3), 0)
+        edge_profile = auto_canny(blur.copy().astype(np.uint8))
         # # DEBUGGING
         # # cv2.imwrite(f"./testing/test_data/output/{idx}_edge.png", edge_profile)
-        # edge_profile = transform(edge_profile)
-        # img = torch.cat((img, edge_profile), dim=0)
+        edge_profile = transform(edge_profile)
+        img = torch.cat((img, edge_profile), dim=0)
         if use_transform:
             # for _ in range(10):
             img = transform_img(
@@ -278,7 +278,7 @@ def train_model():
 
     new_labels = torch.LongTensor(labels)
     datasets = []
-    for trans, adv in [(False, False)]:
+    for trans, adv in [(False, False), (True, True), (False, True), (True, False)]:
         directory = "./testing/test_data/"
         filename = f"adv_{adv}_trans_{trans}_predrawn.pkl"
         full_path = f"{directory}{filename}"
@@ -290,15 +290,17 @@ def train_model():
             pickle.dump(new_images, f)
         datasets.append(RegimeTwoDataset(new_images, new_labels))
     dataset_train = ConcatDataset(datasets)
+    # dataset_train = gtsrb.TrafficSignDataset(x=images, y=labels)
 
     num_train = len(dataset_train)
     indices = list(range(num_train))
     np.random.shuffle(indices)
     split = int(np.floor(0.4 * num_train))
     train_idx = indices[:split]
+    real_num = len(train_idx)
     train_sampler = SubsetRandomSampler(train_idx)
     print(
-        f"There are {num_train} examples in the dataset, and I am using {split} of them!"
+        f"There are {num_train} examples in the dataset, and I am using {real_num} of them!"
     )
 
     dataloader_train = DataLoader(dataset_train, batch_size=64, sampler=train_sampler)
@@ -336,7 +338,7 @@ def train_model():
         training_model.train()
         loss = acc = 0.0
 
-        counter = 0
+        num_sample = 0 
         for data_batch in tqdm(dataloader_train):
             train_predict = training_model(data_batch[0].to(DEVICE))
             batch_loss = LOSS_FUN(train_predict, data_batch[1].to(DEVICE))
@@ -345,13 +347,13 @@ def train_model():
             optimizer.zero_grad()
             acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
             loss += batch_loss.item() * len(data_batch[1])
-            counter += 1
+            num_sample += len(data_batch[0])
         # epoch_end = time.time()
         print(
-            f"Train Acc: {round(float(acc / counter), 4)}",
+            f"Train Acc: {round(float(acc / real_num), 4)}",
             end=" ",
         )
-        print(f"Loss: {round(float(loss / counter), 4)}", end="\n")
+        print(f"Loss: {round(float(loss / real_num), 4)}", end="\n")
 
     torch.save(
         training_model.state_dict(),
