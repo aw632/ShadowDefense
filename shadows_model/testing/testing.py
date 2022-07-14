@@ -1,24 +1,17 @@
 import json
 import pickle
 import subprocess
-from os import listdir
-from os.path import isfile, join
 
 import cv2
 import numpy as np
 import torch
 import torch.multiprocessing as mp
 import torch.nn as nn
-import torchvision.models
-from joblib import Parallel, delayed
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, SubsetRandomSampler
 from torchvision import transforms
 from tqdm import tqdm
 
-import DexiModel.main as dnm
 import gtsrb
-from DexiModel.datasets import TestDataset
-from DexiModel.model import DexiNed
 from shadow_attack import attack
 from utils import (
     SmoothCrossEntropyLoss,
@@ -36,68 +29,10 @@ REGIME_ONE_MODEL = "model/model_gtsrb.pth"
 # )
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 POSITION_LIST, MASK_LIST = load_mask()
-# INPUT_DIR = "testing/test_data/input"
-# OUTPUT_DIR = "testing/test_data/output"
 N_CLASS = 43  # 43 classes in GTSRB
 REGIME_TWO_MODEL = "./testing/regime_two_model.pth"
 DEXINED_MODEL = "./DexiModel/10_model.pth"
 LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
-
-
-def regime_one(out_file):
-    # load file from REGIME_ONE_MODEL and store in variable "model"
-    # model = gtsrb.GtsrbCNN(N_CLASS).to(DEVICE)
-    # model.load_state_dict(
-    #     torch.load(
-    #         REGIME_ONE_MODEL,
-    #         map_location=DEVICE,
-    #     )
-    # )
-    # # pre_process = transforms.Compose([pre_process_image, transforms.ToTensor()])
-    # model.eval()  # set the model in evaluation mode
-
-    # # generate the adversarial images by calling shadow_attack
-    # # note: the images are saved irregardless of the success of the attack
-    # with open("./dataset/GTSRB/test.pkl", "rb") as dataset:
-    #     test_data = pickle.load(dataset)
-    #     images, labels = test_data["data"], test_data["labels"]
-
-    # results = {}
-    # success_no_edges, total_num_images = generate_adv_images(images, labels)
-    # # push the images through the edge profiler
-    # generate_edge_profiles(512, 512)
-    # # test it on the model using "test_single_image"
-    # success_with_edges, confidence_with_edges, _ = evaluate_edge_profiles()
-
-    # # robustness = 1 - success of attacks
-    # results["robustness_no_edges"] = 1 - (success_no_edges / total_num_images)
-    # results["robustness_with_edges"] = success_with_edges / total_num_images
-    # results["confidence_with_edges"] = confidence_with_edges / total_num_images
-    # # save the results to out_file
-    # with open(out_file, "w") as f:
-    #     json.dump(results, f)
-    # raise deprecated error
-    raise DeprecationWarning("This regime is deprecated. Use another regime instead.")
-
-
-def auto_canny(image, sigma=0.33):
-    v = np.median(image)
-    lower = int(max(0, (1.0 - sigma) * v))
-    upper = int(min(255, (1.0 + sigma) * v))
-    edged = cv2.Canny(image, lower, upper)
-    return edged
-
-
-def preprocess_image_nchan(image):
-    """Preprocess the image. same as the paper author's but accounts for the
-    4th channel.
-    """
-    image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
-    image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
-    image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
-    # image[:, :, 3] = cv2.equalizeHist(image[:, :, 3])
-    image = image / 255.0 - 0.5
-    return image
 
 
 class RegimeTwoDataset(Dataset):
@@ -110,18 +45,9 @@ class RegimeTwoDataset(Dataset):
     """
 
     def __init__(self, images, labels):
-        """Initializes the class."""
         super().__init__()
-        # input_files = [join(input, file) for file in listdir(input)]
-        # output_files = [join(output, file) for file in listdir(output)]
-        # assert len(input_files) == len(
-        #     output_files
-        # ), "Must have the same number of input and output files"
-        # self.files = list(zip(input_files, output_files))
         self.images = images
         self.labels = labels
-        # self.transform = transform
-        # self.use_adv = use_adv
 
     def __len__(self):
         return len(self.images)
@@ -202,6 +128,27 @@ class RegimeTwoCNN(nn.Module):
         return out
 
 
+def auto_canny(image, sigma=0.33):
+    v = np.median(image)
+    lower = int(max(0, (1.0 - sigma) * v))
+    upper = int(min(255, (1.0 + sigma) * v))
+    edged = cv2.Canny(image, lower, upper)
+    return edged
+
+
+def preprocess_image_nchan(image):
+    """Preprocess the image. same as the paper author's.
+    Note I commented out the equalization for the last channel because it's a black
+    and white image - nothing will change.
+    """
+    image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
+    image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
+    image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
+    # image[:, :, 3] = cv2.equalizeHist(image[:, :, 3])
+    image = image / 255.0 - 0.5
+    return image
+
+
 def transform_img(image, ang_range, shear_range, trans_range, preprocess):
     # Rotation
     ang_rot = np.random.uniform(ang_range) - ang_range / 2
@@ -250,9 +197,6 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         # always add edge profile
         # FOR DEBUGGING
         # cv2.imwrite(f"./testing/test_data/input/{idx}_original.png", img)
-        # img = preprocess_image_nchan(
-        #     img.astype(np.uint8), use4chan=False
-        # )  # improve contrast to help edge detection
         blur = cv2.GaussianBlur(img, (3, 3), 0)
         edge_profile = auto_canny(blur.copy().astype(np.uint8))
         # # DEBUGGING
@@ -372,9 +316,6 @@ def regime_two_a(out_file):
         out_file: file to write the results to
         fresh_start: if true, will train a fresh model, otherwise load the model.
     """
-    # if fresh_start:
-    #     train_model()
-    #     subprocess.call(["sh", "./cleanup.sh"])
     model = RegimeTwoCNN().to(DEVICE)
     model = model.double()
     model.load_state_dict(
@@ -444,8 +385,6 @@ def test(regime, out_file):
         /shadows_mode/testing.
     """
     match regime:
-        # case "ONE":
-        #     regime_one(out_file)
         case "TRAIN":
             train_model()
         case "TWO_A":
