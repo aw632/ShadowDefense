@@ -120,7 +120,8 @@ def main():
         "--model_to_test",
         type=str,
         default=None,
-        help="Location of the model to test. Requires: model is .pth.",
+        help="Location of the model to test. Requires: model is .pth. If None, then \
+            use the most recent model in ./checkpoints.",
     )
     args = parser.parse_args()
     match args.regime:
