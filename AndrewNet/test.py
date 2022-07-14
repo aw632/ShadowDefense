@@ -25,7 +25,8 @@ def test_regime_a(testing_dataset, device, filename):
     if not filename:
         files = sorted(listdir("./checkpoints/"))
         filename = files[-1]
-    model = AndrewNetCNN().to(device)
+    # use 3 channels since we are using adversarial images with no edge profile.
+    model = AndrewNetCNN(num_channels=3).to(device)
     model = model.float()
     model.load_state_dict(
         torch.load(
@@ -45,7 +46,7 @@ def test_regime_a(testing_dataset, device, filename):
         mask_type = judge_mask_type("GTSRB", labels[index])
         if brightness(images[index], MASK_LIST[mask_type]) >= 120:
             _, success, num_query = attack(
-                images[index], labels[index], POSITION_LIST[mask_type]
+                images[index], labels[index], POSITION_LIST[mask_type], our_model=model
             )
             num_successes += success
             total_num_query += num_query
