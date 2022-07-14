@@ -49,7 +49,7 @@ def test_regime_a(testing_dataset, device, filename):
     for index in trange(len(images)):
         mask_type = judge_mask_type("GTSRB", labels[index])
         if brightness(images[index], MASK_LIST[mask_type]) >= 120:
-            _, success, num_query = attack(
+            success, num_query = attack(
                 images[index], labels[index], POSITION_LIST[mask_type], our_model=model
             )
             num_successes += success

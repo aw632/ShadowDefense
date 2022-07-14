@@ -2,8 +2,10 @@
 
 import json
 
+import cv2
 import numpy as np
 import torch
+from torchvision import transforms
 from torchvision.transforms import Compose
 from shadow_utils import (
     draw_shadow,
@@ -12,6 +14,7 @@ from shadow_utils import (
     random_param_generator,
     shadow_edge_blur,
 )
+from utils import auto_canny
 
 # with open("params.json", "r") as config:
 #     params = json.load(config)
@@ -136,6 +139,15 @@ class PSO:
                 position, self.image, self.coord, self.coefficient
             )
             img = shadow_edge_blur(img, shadow_area, 3)
+            # steps: 1 generate edge profile, 2 concat images, 3 preprocess and send to model
+            new_img = img.copy()
+            blur = cv2.GaussianBlur(new_img, (3, 3), 0)
+            edge_profile = auto_canny(blur.astype(np.uint8))
+            edge_profile = edge_profile[..., np.newaxis]
+            print(img.shape)
+            print(edge_profile.shape)
+            img = np.concatenate((img, edge_profile), axis=2)
+
             img = self.pre_process(img).unsqueeze(0).to(device)
 
         with torch.no_grad():
