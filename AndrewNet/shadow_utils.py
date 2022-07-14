@@ -345,5 +345,3 @@ class SmoothCrossEntropyLoss(_WeightedLoss):
             loss = loss.mean()
 
         return loss
-
-
