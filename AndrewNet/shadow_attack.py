@@ -1,6 +1,6 @@
 from pso import PSO
 from torchvision import transforms
-from shadow_attack import pre_process_image
+from shadow_utils import pre_process_image
 
 
 def attack(
