@@ -1,10 +1,9 @@
-import numpy as np
 import cv2
-import tqdm as tqdm
-from shadow_utils import judge_mask_type, draw_shadow, shadow_edge_blur, load_mask
-from torchvision import transforms
+import numpy as np
 import torch.nn as nn
-
+import tqdm as tqdm
+from shadow_utils import draw_shadow, judge_mask_type, load_mask, shadow_edge_blur
+from torchvision import transforms
 
 POSITION_LIST, MASK_LIST = load_mask()
 

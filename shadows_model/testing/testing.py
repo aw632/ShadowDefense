@@ -3,16 +3,15 @@ import pickle
 import subprocess
 
 import cv2
+import gtsrb
 import numpy as np
 import torch
 import torch.multiprocessing as mp
 import torch.nn as nn
+from shadow_attack import attack
 from torch.utils.data import ConcatDataset, DataLoader, Dataset, SubsetRandomSampler
 from torchvision import transforms
 from tqdm import tqdm
-
-import gtsrb
-from shadow_attack import attack
 from utils import (
     SmoothCrossEntropyLoss,
     brightness,

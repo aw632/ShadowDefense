@@ -1,5 +1,5 @@
-import torch.nn as nn
 import torch
+import torch.nn as nn
 
 N_CLASS = 43  # 43 classes for GTSRB Dataset
 

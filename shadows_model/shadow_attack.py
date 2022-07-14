@@ -1,27 +1,30 @@
 # -*- coding: utf-8 -*-
 
-import os
-import cv2
-import json
-import torch
-import pickle
 import argparse
-import numpy as np
-from pso import PSO
+import json
+import os
+import pickle
+from collections import Counter
+
+import cv2
 import gtsrb
+import numpy as np
+import torch
 
 # import lisa
 from gtsrb import GtsrbCNN
+from pso import PSO
+from torchvision import transforms
 
 # from lisa import LisaCNN
-from utils import brightness
-from utils import shadow_edge_blur
-from utils import judge_mask_type
-from utils import draw_shadow
-from utils import load_mask
-from utils import pre_process_image
-from collections import Counter
-from torchvision import transforms
+from utils import (
+    brightness,
+    draw_shadow,
+    judge_mask_type,
+    load_mask,
+    pre_process_image,
+    shadow_edge_blur,
+)
 
 with open("params.json", "rb") as f:
     params = json.load(f)

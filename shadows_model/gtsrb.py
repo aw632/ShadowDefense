@@ -1,20 +1,23 @@
 # -*- coding: utf-8 -*-
 
 import gc
+import json
 import pickle
 import time
-import json
+
 import cv2
 import numpy as np
 import torch
 import torch.nn as nn
-from torchvision import transforms
 from torch.utils.data.dataloader import DataLoader
-from utils import SmoothCrossEntropyLoss
-from utils import draw_shadow
-from utils import shadow_edge_blur
-from utils import judge_mask_type
-from utils import load_mask
+from torchvision import transforms
+from utils import (
+    SmoothCrossEntropyLoss,
+    draw_shadow,
+    judge_mask_type,
+    load_mask,
+    shadow_edge_blur,
+)
 
 with open("params.json", "r") as config:
     params = json.load(config)

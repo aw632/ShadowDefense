@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 
-import torch
 import json
+
 import numpy as np
-from utils import draw_shadow
-from utils import shadow_edge_blur
-from utils import image_transformation
-from utils import random_param_generator
-from utils import polygon_correction
+import torch
 from torchvision.transforms import Compose
+from utils import (
+    draw_shadow,
+    image_transformation,
+    polygon_correction,
+    random_param_generator,
+    shadow_edge_blur,
+)
 
 with open("params.json", "r") as config:
     params = json.load(config)

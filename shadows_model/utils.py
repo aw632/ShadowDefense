@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 
 import os
-import numpy as np
-import cv2
-import torch
-import random
 import pickle
-from torchvision import transforms
-from torch.nn.modules.loss import _WeightedLoss
+import random
+from itertools import permutations
+
+import cv2
+import numpy as np
+import torch
 import torch.nn.functional as F
 from shapely.geometry import Polygon
-from itertools import permutations
+from torch.nn.modules.loss import _WeightedLoss
+from torchvision import transforms
 
 
 def load_lisa(database_path):

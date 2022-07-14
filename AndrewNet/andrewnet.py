@@ -1,14 +1,15 @@
-import pickle
-import torch
-from utils import predraw_shadows_and_edges, weights_init
-from dataset import AndrewNetDataset
-from cnn_networks import AndrewNetCNN
-from torch.utils.data import ConcatDataset, DataLoader, SubsetRandomSampler
-import numpy as np
-from datetime import datetime
-import tqdm as tqdm
-from shadow_utils import SmoothCrossEntropyLoss
 import argparse
+import pickle
+from datetime import datetime
+
+import numpy as np
+import torch
+import tqdm as tqdm
+from cnn_networks import AndrewNetCNN
+from dataset import AndrewNetDataset
+from shadow_utils import SmoothCrossEntropyLoss
+from torch.utils.data import ConcatDataset, DataLoader, SubsetRandomSampler
+from utils import predraw_shadows_and_edges, weights_init
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ANET_MODEL = "checkpoints/model"
