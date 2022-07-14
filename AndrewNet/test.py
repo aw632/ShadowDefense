@@ -1,9 +1,13 @@
 import pickle
 from os import listdir
 
+import cv2
+import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from tqdm import trange
+from torchvision import transforms
+
 
 from cnn_networks import AndrewNetCNN
 from dataset import AndrewNetDataset
@@ -14,7 +18,7 @@ from shadow_utils import (
     load_mask,
 )
 from shadow_attack import attack
-from utils import predraw_shadows_and_edges
+from utils import predraw_shadows_and_edges, auto_canny
 
 LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
 POSITION_LIST, MASK_LIST = load_mask()
@@ -45,6 +49,17 @@ def test_regime_a(testing_dataset, device, filename):
     for index in trange(len(images)):
         mask_type = judge_mask_type("GTSRB", labels[index])
         if brightness(images[index], MASK_LIST[mask_type]) >= 120:
+
+            # concat the edge profile
+            new_img = images[index].copy()
+            blur = cv2.GaussianBlur(new_img, (3, 3), 0)
+            edge_profile = auto_canny(blur.copy().astype(np.uint8))
+            edge_profile = edge_profile[..., np.newaxis]
+            images[index] = np.concatenate((images[index], edge_profile), axis=2)
+            images[index] = images[index].astype(np.float64)
+            transform = transforms.Compose([transforms.ToTensor()])
+            images[index] = transform(images[index])
+
             _, success, num_query = attack(
                 images[index], labels[index], POSITION_LIST[mask_type], our_model=model
             )
