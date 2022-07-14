@@ -32,7 +32,7 @@ There are four regimes currently available to access.
 
   Some of the original images have a shadow randomly applied to them, as described in Zhong et al (2022), and some of the combined images are transformed with random shear, rotation, and translation.
 
-Each of the lettered regimes test the model using the provided testing dataset, and collects stastictis on the robustness of the model. 
+Each of the lettered regimes test the model using the provided testing dataset, and collects stastictis on the robustness of the model.
 > :warning: Requires: the training dataset is saved as a `.pkl` file with an iterable of images accessible by the identifier `images` and an iterable of associated labels accessible by the identifier `labels`.
   
 **Regime TEST_A** tests the model on adversarially perturbed (shadows added) images from the test set, with associated edge profiles added as a channel.
