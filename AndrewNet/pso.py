@@ -98,7 +98,7 @@ class PSO:
         self.label = label
         self.image = image
         self.coord = coord
-        self.model = model
+        self.model = model.to(device)
         self.targeted = targeted
         self.physical = physical
         self.pre_process = pre_process
@@ -144,8 +144,8 @@ class PSO:
             blur = cv2.GaussianBlur(new_img, (3, 3), 0)
             edge_profile = auto_canny(blur.astype(np.uint8))
             edge_profile = edge_profile[..., np.newaxis]
-            print(img.shape)
-            print(edge_profile.shape)
+            # print(img.shape)
+            # print(edge_profile.shape)
             img = np.concatenate((img, edge_profile), axis=2)
 
             img = self.pre_process(img).unsqueeze(0).to(device)
