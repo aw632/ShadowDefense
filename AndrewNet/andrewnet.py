@@ -14,7 +14,7 @@ from shadow_utils import SmoothCrossEntropyLoss
 from utils import predraw_shadows_and_edges, weights_init
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-ANET_MODEL = "checkpoints/model"
+ANET_MODEL = "./checkpoints/model"
 LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
 
 
@@ -55,13 +55,13 @@ def train_model(args):
     optimizer = torch.optim.Adam(
         training_model.parameters(), lr=0.001, weight_decay=1e-5
     )
-    for epoch in tqdm(range(num_epoch)):
+    for epoch in range(num_epoch):
         print("NOW AT: Epoch {}".format(epoch))
         training_model.train()
         loss = acc = 0.0
 
         num_sample = 0
-        for data_batch in tqdm(dataloader_train, leave=True):
+        for data_batch in tqdm(dataloader_train):
             train_predict = training_model(data_batch[0].to(DEVICE))
             batch_loss = LOSS_FUN(train_predict, data_batch[1].to(DEVICE))
             batch_loss.backward()

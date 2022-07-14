@@ -9,11 +9,11 @@ from cnn_networks import AndrewNetCNN
 from dataset import AndrewNetDataset
 from shadow_utils import (
     SmoothCrossEntropyLoss,
-    attack,
     brightness,
     judge_mask_type,
     load_mask,
 )
+from shadow_attack import attack
 from utils import predraw_shadows_and_edges
 
 LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
@@ -24,9 +24,9 @@ def test_regime_a(testing_dataset, device, filename):
     # load the latest model
     if not filename:
         files = sorted(listdir("./checkpoints/"))
-        filename = files[-1]
+        filename = f"./checkpoints/{files[-1]}"
     # use 3 channels since we are using adversarial images with no edge profile.
-    model = AndrewNetCNN(num_channels=3).to(device)
+    model = AndrewNetCNN(num_channels=4).to(device)
     model = model.float()
     model.load_state_dict(
         torch.load(

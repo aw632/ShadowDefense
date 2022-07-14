@@ -35,9 +35,10 @@ There are four regimes currently available to access.
 Each of the lettered regimes test the model using the provided testing dataset, and collects stastictis on the robustness of the model.
 > :warning: Requires: the training dataset is saved as a `.pkl` file with an iterable of images accessible by the identifier `images` and an iterable of associated labels accessible by the identifier `labels`.
 
-**Regime TEST_A** tests the model on adversarially perturbed (shadows added) images from the test set, *without* associated edge profiles added as a channel; i.e., the images have only 3 channels. This matches the robustness experiments found in the Zhong paper.
+**Regime TEST_A** tests the model on adversarially perturbed (shadows added) images from the test set, with associated edge profiles added as a channel.
 
-**Regime TEST_B** tests the model on adversarially perturbed (shadows added) images from the test set, with associated edge profiles added as a channel.
+**Regime TEST_B** tests the model on adversarially perturbed (shadows added) images from the test set, *without* associated edge profiles added as a channel; i.e., the images have only 3 channels. This matches the robustness experiments found in the Zhong paper.
+
 
 ## Results
 

@@ -5,7 +5,7 @@ import json
 import numpy as np
 import torch
 from torchvision.transforms import Compose
-from utils import (
+from shadow_utils import (
     draw_shadow,
     image_transformation,
     polygon_correction,
