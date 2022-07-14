@@ -9,7 +9,7 @@ shadows_model/testing/.nfs*
 shadows_model/testing/regime_two_model*
 DexiNed/
 shadows_model/testing/test_data/*.pkl
-AndrewNet/checkpoints/*
+AndrewNet/checkpoints/*.pth
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
