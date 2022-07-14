@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import torch.nn as nn
-import tqdm as tqdm
+from tqdm import tqdm
 from shadow_utils import draw_shadow, judge_mask_type, load_mask, shadow_edge_blur
 from torchvision import transforms
 

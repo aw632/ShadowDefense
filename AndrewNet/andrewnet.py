@@ -4,7 +4,7 @@ from datetime import datetime
 
 import numpy as np
 import torch
-import tqdm as tqdm
+from tqdm import tqdm
 from cnn_networks import AndrewNetCNN
 from dataset import AndrewNetDataset
 from shadow_utils import SmoothCrossEntropyLoss
@@ -23,6 +23,7 @@ def train_model(args):
 
     new_labels = torch.LongTensor(labels)
     datasets = []
+    print("Generating image datasets...")
     for trans, adv in [(False, False), (True, True), (False, True), (True, False)]:
         new_images = predraw_shadows_and_edges(
             images, new_labels, use_adv=adv, use_transform=trans
