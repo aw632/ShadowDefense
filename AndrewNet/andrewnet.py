@@ -1,14 +1,16 @@
 import argparse
 import pickle
+import test
 from datetime import datetime
 
 import numpy as np
 import torch
+from torch.utils.data import ConcatDataset, DataLoader, SubsetRandomSampler
 from tqdm import tqdm
+
 from cnn_networks import AndrewNetCNN
 from dataset import AndrewNetDataset
 from shadow_utils import SmoothCrossEntropyLoss
-from torch.utils.data import ConcatDataset, DataLoader, SubsetRandomSampler
 from utils import predraw_shadows_and_edges, weights_init
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -74,12 +76,14 @@ def train_model(args):
         )
         print(f"Loss: {round(float(loss / real_num), 4)}", end="\n")
 
-    filename = f"{ANET_MODEL}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.pth"
+    filename = (
+        f"{ANET_MODEL}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{num_epoch}.pth"
+    )
     torch.save(
         training_model.state_dict(),
         filename,
     )
-    print(f"Model saved to {filename}")
+    print(f"Model saved to {filename}!")
 
 
 def main():
@@ -111,12 +115,19 @@ def main():
         default="./dataset/GTSRB/test.pkl",
         help="Location of the test dataset. Requires: dataset is pickled.",
     )
+    parser.add_argument(
+        "-m",
+        "--model_to_test",
+        type=str,
+        default=None,
+        help="Location of the model to test. Requires: model is .pth.",
+    )
     args = parser.parse_args()
     match args.regime:
         case "TRAIN":
             train_model(args)
         case "TEST_A":
-            raise NotImplementedError
+            test.test_regime_a(args.test_dataset_location, DEVICE, args.model_to_test)
         case "TEST_B":
             raise NotImplementedError
 
