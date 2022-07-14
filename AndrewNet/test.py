@@ -1,16 +1,10 @@
 import pickle
 from os import listdir
 
-import cv2
-import numpy as np
 import torch
-from torch.utils.data import DataLoader
 from tqdm import trange
-from torchvision import transforms
-
 
 from cnn_networks import AndrewNetCNN
-from dataset import AndrewNetDataset
 from shadow_utils import (
     SmoothCrossEntropyLoss,
     brightness,
@@ -24,7 +18,21 @@ LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
 POSITION_LIST, MASK_LIST = load_mask()
 
 
-def test_regime_a(testing_dataset, device, filename):
+def test_regime_a(testing_dataset, device, filename=None):
+    """Test_regime_a uses the images and labels from testing_dataset and loads
+    the model weights from filename. If filename is none, it loads the latest
+    model from ./checkpoints. It then sends the model to device.
+
+    Requires: testing_dataset is saved as a .pkl file with an iterable of [images]
+    accessible by the identifier images and an iterable of associated labels
+    accessible by the identifier [labels].
+
+    Args:
+        testing_dataset (str): path to the testing dataset as a .pkl file.
+        device (str): torch device, one of "cuda", "mps", "cpu".
+        filename (str, optional): Name of the file to load model weights from. Defaults to None.
+    """
+
     # load the latest model
     if not filename:
         files = sorted(listdir("./checkpoints/"))

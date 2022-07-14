@@ -14,59 +14,6 @@ from torch.nn.modules.loss import _WeightedLoss
 from torchvision import transforms
 
 
-def load_lisa(database_path):
-    train_path = os.path.join(database_path, "train")
-    test_path = os.path.join(database_path, "test")
-    train_img_paths = os.listdir(train_path)
-    test_img_paths = os.listdir(test_path)
-
-    train_data = np.zeros((len(train_img_paths), 32, 32, 3), dtype=np.uint8)
-    train_labels = np.zeros((len(train_img_paths),), dtype=np.int)
-    test_data = np.zeros((len(test_img_paths), 32, 32, 3), dtype=np.uint8)
-    test_labels = np.zeros((len(test_img_paths),), dtype=np.int)
-
-    for i, path in enumerate(train_img_paths):
-        img_path = os.path.join(train_path, path)
-        c, _ = map(int, path[:-4].split("_"))
-        train_data[i] = cv2.imread(img_path)
-        train_labels[i] = c
-
-    for i, path in enumerate(test_img_paths):
-        img_path = os.path.join(test_path, path)
-        c, _ = map(int, path[:-4].split("_"))
-        test_data[i] = cv2.imread(img_path)
-        test_labels[i] = c
-
-    return train_data, train_labels, test_data, test_labels
-
-
-def load_gtsrb(database_path):
-
-    train_path = os.path.join(database_path, "train")
-    test_path = os.path.join(database_path, "test")
-    train_img_paths = os.listdir(train_path)
-    test_img_paths = os.listdir(test_path)
-
-    train_data = np.zeros((len(train_img_paths), 32, 32, 3), dtype=np.uint8)
-    train_labels = np.zeros((len(train_img_paths),), dtype=np.int)
-    test_data = np.zeros((len(test_img_paths), 32, 32, 3), dtype=np.uint8)
-    test_labels = np.zeros((len(test_img_paths),), dtype=np.int)
-
-    for i, path in enumerate(train_img_paths):
-        img_path = os.path.join(train_path, path)
-        c, _ = map(int, path[:-4].split("_"))
-        train_data[i] = cv2.imread(img_path)
-        train_labels[i] = c
-
-    for i, path in enumerate(test_img_paths):
-        img_path = os.path.join(test_path, path)
-        c, _ = map(int, path[:-4].split("_"))
-        test_data[i] = cv2.imread(img_path)
-        test_labels[i] = c
-
-    return train_data, train_labels, test_data, test_labels
-
-
 def load_mask():
 
     position_list, mask_list = [], []
@@ -200,7 +147,16 @@ def draw_shadow(position, image, pos_list, coefficient):
 
 
 def motion_blur(image, size=12, angle=45):
+    """Blurs the image using a motion blur algorithm.
 
+    Args:
+        image (ndarray): image to blur
+        size (int, optional): Size of the blurring. Defaults to 12.
+        angle (int, optional): Angle of blurring. Defaults to 45.
+
+    Returns:
+        ndarray: blurred image, passed through a filter.
+    """
     if size == 0:
         return image
 
@@ -217,6 +173,16 @@ def motion_blur(image, size=12, angle=45):
 
 
 def random_param_generator(num, w, h):
+    """Generates random parameters for particle swarm optimization.
+
+    Args:
+        num (_type_): _description_
+        w (_type_): _description_
+        h (_type_): _description_
+
+    Returns:
+        tuple: 7-tuple of the generated parameters.
+    """
 
     motion_degree = [random.randint(1, 10) for _ in range(num)] + [0]
     motion_angle = [random.uniform(0, 360) for _ in range(num)] + [0]

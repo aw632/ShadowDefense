@@ -19,6 +19,9 @@ LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
 
 
 def train_model(args):
+    """Trains the model. See instructions.md for more information.
+    This function should not be called by the user directly.
+    """
     with open(args.train_dataset_location, "rb") as dataset:
         train_data = pickle.load(dataset)
         images, labels = train_data["data"], train_data["labels"]
