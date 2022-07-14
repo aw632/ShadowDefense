@@ -1,4 +1,9 @@
 from pso import PSO
+from torchvision import transforms
+import cv2
+import numpy as np
+from utils import preprocess_image_nchan, draw_shadow, shadow_edge_blur, auto_canny
+
 
 def attack(
     attack_image,
@@ -30,6 +35,17 @@ def attack(
     global_best_solution = float("inf")
     global_best_position = None
 
+    new_img = attack_image.copy()
+    blur = cv2.GaussianBlur(new_img, (3, 3), 0)
+    edge_profile = auto_canny(blur.copy().astype(np.uint8))
+    edge_profile = edge_profile[..., np.newaxis]
+    print(attack_image.shape)
+    print(edge_profile.shape)
+    attack_image = np.concatenate((attack_image, edge_profile), axis=2)
+    attack_image = attack_image.astype(np.float64)
+    transform = transforms.Compose([transforms.ToTensor()])
+    attack_image = transform(attack_image)
+
     for attempt in range(5):
 
         if succeed:
@@ -44,7 +60,9 @@ def attack(
         x_min, x_max = -16, 48
         max_speed = 1.5
         shadow_level = 0.43
-        pre_process = transforms.Compose([pre_process_image, transforms.ToTensor()])
+        pre_process = transforms.Compose(
+            [preprocess_image_nchan, transforms.ToTensor()]
+        )
         pso = PSO(
             polygon * 2,
             particle_size,
