@@ -35,7 +35,6 @@ def train_model(args):
         )
         datasets.append(AndrewNetDataset(new_images, new_labels))
     dataset_train = ConcatDataset(datasets)
-    # dataset_train = gtsrb.TrafficSignDataset(x=images, y=labels)
 
     num_train = len(dataset_train)
     indices = list(range(num_train))
