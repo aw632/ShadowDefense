@@ -12,7 +12,7 @@ usage: andrewnet.py [-h] [-d DATA_FRACTION] [-train_l TRAIN_DATASET_LOCATION]
 Entry point into the ANet Model.
 
 positional arguments:
-  {TRAIN,TEST_A,TEST_B}
+  {TRAIN,TEST_A,TEST_B,TEST_C}
                         Regime to train the model on. Must be one of TRAIN,
                         TEST_A, TEST_B, TEST_C.
 
@@ -54,6 +54,7 @@ Each of the lettered regimes test the model using the provided testing dataset, 
 
 **Regime TEST_B** tests the model on benign images from the test set, with associated edge profiles added as a channel.
 
+**Regime TEST_C** tests the model on adversarial images from the test set, with added Gaussian noise $\mu = 0, \sigma = \frac{\sigma_{\text{train}}}{2}$, where $\sigma_{\text{train}}$ is the standard deviation of all pixels in all channels in the training set.
 
 ## Results
 

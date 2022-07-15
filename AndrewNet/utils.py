@@ -85,7 +85,7 @@ def transform_img(image, ang_range, shear_range, trans_range, preprocess):
     return image
 
 
-def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
+def predraw_shadows_and_edges(images, labels, use_adv, use_transform, make_tensor=True):
     """Draw shadows and generate edge profiles for every image in images, then
     stack the edge profile as a new channel for images.
 
@@ -94,6 +94,7 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
         labels (iterable): Iterable of labels stored as integers.
         use_adv (bool): if True, then draw shadows.
         use_transform (bool): if True, then apply random transformations to the images.
+        make_tensor (bool): if True, then convert the images to a tensor.
 
     Returns:
         list: a list of ndarray with dtype=float64 representing images.
@@ -132,8 +133,9 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform):
             )
         else:
             img = preprocess_image_nchan(img.astype(np.uint8))
-        transform = transforms.Compose([transforms.ToTensor()])
-        img = transform(img)
+        if make_tensor:
+            transform = transforms.Compose([transforms.ToTensor()])
+            img = transform(img)
         new_images.append(img)
     return new_images
 

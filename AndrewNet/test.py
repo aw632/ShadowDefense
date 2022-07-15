@@ -17,7 +17,7 @@ LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
 POSITION_LIST, MASK_LIST = load_mask()
 
 
-def test_regime_a(testing_dataset, device, filename=None):
+def prep_regimes(testing_dataset, device, filename=None):
     """Test_regime_a uses the images and labels from testing_dataset and loads
     the model weights from filename. If filename is none, it loads the latest
     model from ./checkpoints. It then sends the model to device.
@@ -30,9 +30,10 @@ def test_regime_a(testing_dataset, device, filename=None):
         testing_dataset (str): path to the testing dataset as a .pkl file.
         device (str): torch device, one of "cuda", "mps", "cpu".
         filename (str, optional): Name of the file to load model weights from. Defaults to None.
-    """
 
-    # load the latest model
+    Returns:
+        tuple: tuple of (filename, images, labels, model)
+    """
     if not filename:
         files = sorted(listdir("./checkpoints/"))
         filename = f"./checkpoints/{files[-2]}"
@@ -45,11 +46,32 @@ def test_regime_a(testing_dataset, device, filename=None):
             map_location=device,
         )
     )
-    model.eval()
 
     with open(testing_dataset, "rb") as dataset:
         test_data = pickle.load(dataset)
         images, labels = test_data["data"], test_data["labels"]
+
+    return files, filename, images, labels, model
+
+
+def test_regime_a(testing_dataset, device, filename=None):
+    """See instructions.md for details on Test Regime A.
+
+    Requires: testing_dataset is saved as a .pkl file with an iterable of [images]
+    accessible by the identifier images and an iterable of associated labels
+    accessible by the identifier [labels].
+
+    Args:
+        testing_dataset (str): path to the testing dataset as a .pkl file.
+        device (str): torch device, one of "cuda", "mps", "cpu".
+        filename (str, optional): Name of the file to load model weights from. Defaults to None.
+    """
+
+    # load the latest model
+    files, filename, images, labels, model = prep_regimes(
+        testing_dataset=testing_dataset, device=device, filename=filename
+    )
+    model.eval()
 
     num_successes = 0
     total_num_query = 0
@@ -68,8 +90,10 @@ def test_regime_a(testing_dataset, device, filename=None):
     print(f"Attack robustness: {robustness}")
     print(f"Average queries: {avg_queries}")
     results = {
-        "robustness": robustness,
-        "avg_queries": avg_queries,
+        "Robustness": robustness,
+        "Average number of queries": avg_queries,
+        "Dataset Size": num_images,
+        "Batch Size": 64,
     }
     with open(
         f"./testing_results/results_A_{files[-2][6:len(files[-2]) - 4]}.json", "wb"
@@ -79,23 +103,10 @@ def test_regime_a(testing_dataset, device, filename=None):
 
 def test_regime_b(testing_dataset, device, filename=None):
     # load the latest model
-    if not filename:
-        files = sorted(listdir("./checkpoints/"))
-        filename = f"./checkpoints/{files[-2]}"
-    # use 3 channels since we are using adversarial images with no edge profile.
-    model = AndrewNetCNN(num_channels=4).to(device)
-    model = model.float()
-    model.load_state_dict(
-        torch.load(
-            filename,
-            map_location=device,
-        )
+    files, filename, images, labels, model = prep_regimes(
+        testing_dataset=testing_dataset, device=device, filename=filename
     )
     model.eval()
-
-    with open(testing_dataset, "rb") as dataset:
-        test_data = pickle.load(dataset)
-        images, labels = test_data["data"], test_data["labels"]
 
     new_labels = torch.LongTensor(labels)
     datasets = []
@@ -122,11 +133,80 @@ def test_regime_b(testing_dataset, device, filename=None):
     )
     results = {
         "Benign Test Acc": round(float(acc / len(dataset_test)), 4),
-        "Dataset Size" : len(dataset_test),
-        "Batch Size" : 64,
+        "Dataset Size": len(dataset_test),
+        "Batch Size": 64,
     }
     with open(
         f"./testing_results/results_B_{files[-2][6:len(files[-2]) - 4]}.json", "w"
+    ) as f:
+        json.dump(results, f)
+
+
+def test_regime_c(training_dataset, testing_dataset, device, filename=None):
+    files, filename, test_images, test_labels, model = prep_regimes(
+        testing_dataset=testing_dataset, device=device, filename=filename
+    )
+    model.eval()
+
+    # calculate the stdev of all pixels across all channels in the training set
+    with open(training_dataset, "rb") as dataset:
+        train_data = pickle.load(dataset)
+        train_images, train_labels = train_data["data"], train_data["labels"]
+
+    new_labels = torch.LongTensor(train_labels)
+    all_images = predraw_shadows_and_edges(
+        train_images, new_labels, use_adv=False, use_transform=False, make_tensor=False
+    )
+    all_images = np.array(all_images)
+    for trans, adv in [(True, True), (True, False), (False, True)]:
+        new_images = predraw_shadows_and_edges(
+            train_images,
+            new_labels,
+            use_adv=adv,
+            use_transform=trans,
+            make_tensor=False,
+        )
+        new_images = np.array(new_images)
+        all_images = np.concatenate((all_images, new_images), axis=0)
+    all_images = np.ndarray.flatten(all_images)
+    sigmaprime = np.std(all_images)
+    sigma = round(float(sigmaprime / 2), 4)
+    mean = 0
+
+    # add gaussian noise with mean, sigma to every image in test_images
+    test_images = np.array(test_images)
+    noise = np.clip(
+        np.random.normal(mean, sigma, test_images.shape).astype(np.uint8), 0, 255
+    )
+    test_images += noise
+
+    num_successes = 0
+    total_num_query = 0
+    num_images = int(np.floor(len(test_images) * 1))
+    for index in trange(num_images):
+        mask_type = judge_mask_type("GTSRB", test_labels[index])
+        if brightness(test_images[index], MASK_LIST[mask_type]) >= 120:
+            success, num_query = attack(
+                test_images[index],
+                test_labels[index],
+                POSITION_LIST[mask_type],
+                our_model=model,
+            )
+            num_successes += success
+            total_num_query += num_query
+
+    avg_queries = round(float(total_num_query) / num_images, 4)
+    robustness = 1 - round(float(num_successes / num_images), 4)
+    print(f"Attack robustness: {robustness}")
+    print(f"Average queries: {avg_queries}")
+    results = {
+        "Robustness": robustness,
+        "Average number of queries": avg_queries,
+        "Dataset Size": num_images,
+        "Batch Size": 64,
+    }
+    with open(
+        f"./testing_results/results_A_{files[-2][6:len(files[-2]) - 4]}.json", "wb"
     ) as f:
         json.dump(results, f)
 
