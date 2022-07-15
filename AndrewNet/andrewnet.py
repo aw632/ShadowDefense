@@ -139,18 +139,6 @@ def main():
         help="Number of times to repeat the test.",
     )
     args = parser.parse_args()
-
-    if args.regime == "TRAIN":
-        train_model(args)
-    elif args.regime == "TEST_A":
-        test.test_model(args, "A")
-    elif args.regime == "TEST_B":
-        test.test_model(args, "B")
-    elif args.regime == "TEST_C1":
-        test.test_model(args, "C1")
-    elif args.regime == "TEST_C2":
-        test.test_model(args, "C2")
-    args = parser.parse_args()
     match args.regime:
         case "TRAIN":
             train_model(args)
