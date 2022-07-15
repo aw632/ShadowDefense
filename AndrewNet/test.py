@@ -54,7 +54,7 @@ def prep_regimes(testing_dataset, device, filename=None):
     return files, filename, images, labels, model
 
 
-def test_regime_a(testing_dataset, device, filename=None):
+def test_regime_a(testing_dataset, device, proportion, filename=None):
     """See instructions.md for details on Test Regime A.
 
     Requires: testing_dataset is saved as a .pkl file with an iterable of [images]
@@ -75,7 +75,7 @@ def test_regime_a(testing_dataset, device, filename=None):
 
     num_successes = 0
     total_num_query = 0
-    num_images = int(np.floor(len(images) * 1))
+    num_images = int(np.floor(len(images) * proportion))
     for index in trange(num_images):
         mask_type = judge_mask_type("GTSRB", labels[index])
         if brightness(images[index], MASK_LIST[mask_type]) >= 120:
@@ -142,7 +142,7 @@ def test_regime_b(testing_dataset, device, filename=None):
         json.dump(results, f)
 
 
-def test_regime_c(training_dataset, testing_dataset, device, filename=None):
+def test_regime_c(training_dataset, testing_dataset, device, proportion, filename=None):
     files, filename, test_images, test_labels, model = prep_regimes(
         testing_dataset=testing_dataset, device=device, filename=filename
     )
@@ -182,7 +182,7 @@ def test_regime_c(training_dataset, testing_dataset, device, filename=None):
 
     num_successes = 0
     total_num_query = 0
-    num_images = int(np.floor(len(test_images) * 1))
+    num_images = int(np.floor(len(test_images) * proportion))
     for index in trange(num_images):
         mask_type = judge_mask_type("GTSRB", test_labels[index])
         if brightness(test_images[index], MASK_LIST[mask_type]) >= 120:

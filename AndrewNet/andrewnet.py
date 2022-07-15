@@ -125,6 +125,13 @@ def main():
         help="Location of the model to test. Requires: model is .pth. If None, then \
             use the most recent model in ./checkpoints.",
     )
+    parser.add_argument(
+        "-p",
+        "--proportion_of_test",
+        type=float,
+        default=1.0,
+        help="Fraction of test data to use for testing.",
+    )
     args = parser.parse_args()
     match args.regime:
         case "TRAIN":
