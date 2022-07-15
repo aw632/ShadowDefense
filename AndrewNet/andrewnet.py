@@ -132,7 +132,7 @@ def main():
         case "TEST_A":
             test.test_regime_a(args.test_dataset_location, DEVICE, args.model_to_test)
         case "TEST_B":
-            raise NotImplementedError
+            test.test_regime_b(args.test_dataset_location, DEVICE, args.model_to_test)
 
 
 if __name__ == "__main__":
