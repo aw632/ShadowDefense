@@ -52,7 +52,7 @@ Each of the lettered regimes test the model using the provided testing dataset, 
 
 **Regime TEST_A** tests the model on adversarially perturbed (shadows added) images from the test set, with associated edge profiles added as a channel.
 
-**Regime TEST_B** tests the model on adversarially perturbed (shadows added) images from the test set, *without* associated edge profiles added as a channel; i.e., the images have only 3 channels. This matches the robustness experiments found in the Zhong paper.
+**Regime TEST_B** tests the model on benign images from the test set, with associated edge profiles added as a channel.
 
 
 ## Results
