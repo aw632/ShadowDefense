@@ -97,7 +97,7 @@ def test_regime_a(testing_dataset, device, proportion, filename=None):
         "Batch Size": 64,
     }
     with open(
-        f"./testing_results/results_A_{files[-2][6:len(files[-2]) - 4]}.json", "wb"
+        f"./testing_results/results_A_{files[-2][6:len(files[-2]) - 4]}.json", "w"
     ) as f:
         json.dump(results, f)
 
