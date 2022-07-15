@@ -93,8 +93,8 @@ def main():
     parser.add_argument(
         "regime",
         type=str,
-        choices=["TRAIN", "TEST_A", "TEST_B", "TEST_C"],
-        help="Regime to train the model on. Must be one of TRAIN, TEST_A, TEST_B, TEST_C.",
+        choices=["TRAIN", "TEST_A", "TEST_B", "TEST_C1", "TEST_C2"],
+        help="Regime to train the model on.",
     )
     parser.add_argument(
         "-d",
@@ -142,12 +142,22 @@ def main():
             )
         case "TEST_B":
             test.test_regime_b(args.test_dataset_location, DEVICE, args.model_to_test)
-        case "TEST_C":
+        case "TEST_C1":
             test.test_regime_c(
                 args.train_dataset_location,
                 args.test_dataset_location,
                 DEVICE,
                 args.proportion,
+                True,
+                args.model_to_test,
+            )
+        case "TEST_C2":
+            test.test_regime_c(
+                args.train_dataset_location,
+                args.test_dataset_location,
+                DEVICE,
+                args.proportion,
+                False,
                 args.model_to_test,
             )
 

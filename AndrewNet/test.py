@@ -3,6 +3,7 @@ from os import listdir
 import json
 
 import torch
+import cv2
 from tqdm import trange
 
 from cnn_networks import AndrewNetCNN
@@ -142,7 +143,9 @@ def test_regime_b(testing_dataset, device, filename=None):
         json.dump(results, f)
 
 
-def test_regime_c(training_dataset, testing_dataset, device, proportion, filename=None):
+def test_regime_c(
+    training_dataset, testing_dataset, device, proportion, attack, filename=None
+):
     files, filename, test_images, test_labels, model = prep_regimes(
         testing_dataset=testing_dataset, device=device, filename=filename
     )
@@ -170,7 +173,7 @@ def test_regime_c(training_dataset, testing_dataset, device, proportion, filenam
         all_images = np.concatenate((all_images, new_images), axis=0)
     all_images = np.ndarray.flatten(all_images)
     sigmaprime = np.std(all_images)
-    sigma = round(float(sigmaprime / 2), 4)
+    sigma = round(float(sigmaprime / 5), 4)
     mean = 0
 
     # add gaussian noise with mean, sigma to every image in test_images
@@ -180,35 +183,81 @@ def test_regime_c(training_dataset, testing_dataset, device, proportion, filenam
     )
     test_images += noise
 
-    num_successes = 0
-    total_num_query = 0
-    num_images = int(np.floor(len(test_images) * proportion))
-    for index in trange(num_images):
-        mask_type = judge_mask_type("GTSRB", test_labels[index])
-        if brightness(test_images[index], MASK_LIST[mask_type]) >= 120:
-            success, num_query = attack(
-                test_images[index],
-                test_labels[index],
-                POSITION_LIST[mask_type],
-                our_model=model,
-            )
-            num_successes += success
-            total_num_query += num_query
+    if attack:
+        num_successes = 0
+        total_num_query = 0
+        num_images = int(np.floor(len(test_images) * proportion))
+        for index in trange(num_images):
+            mask_type = judge_mask_type("GTSRB", test_labels[index])
+            if brightness(test_images[index], MASK_LIST[mask_type]) >= 120:
+                success, num_query = attack(
+                    test_images[index],
+                    test_labels[index],
+                    POSITION_LIST[mask_type],
+                    our_model=model,
+                )
+                num_successes += success
+                total_num_query += num_query
 
-    avg_queries = round(float(total_num_query) / num_images, 4)
-    robustness = 1 - round(float(num_successes / num_images), 4)
-    print(f"Attack robustness: {robustness}")
-    print(f"Average queries: {avg_queries}")
-    results = {
-        "Robustness": robustness,
-        "Average number of queries": avg_queries,
-        "Dataset Size": num_images,
-        "Batch Size": 64,
-    }
-    with open(
-        f"./testing_results/results_A_{files[-2][6:len(files[-2]) - 4]}.json", "wb"
-    ) as f:
-        json.dump(results, f)
+        avg_queries = round(float(total_num_query) / num_images, 4)
+        robustness = 1 - round(float(num_successes / num_images), 4)
+        print(f"Attack robustness: {robustness}")
+        print(f"Average queries: {avg_queries}")
+        results = {
+            "Robustness": robustness,
+            "Average number of queries": avg_queries,
+            "Dataset Size": num_images,
+            "Batch Size": 64,
+        }
+        with open(
+            f"./testing_results/results_A_{files[-2][6:len(files[-2]) - 4]}.json", "w"
+        ) as f:
+            json.dump(results, f)
+    else:
+        img = test_images[0]
+        blur = cv2.GaussianBlur(img, (3, 3), 0)
+        edge_profile = auto_canny(blur.copy().astype(np.uint8))
+        cv2.imshow("edge profile", edge_profile)
+        cv2.waitKey(0)
+
+        # # DEBUGGING
+        # # cv2.imwrite(f"./testing/test_data/output/{idx}_edge.png", edge_profile)
+        edge_profile = edge_profile[..., np.newaxis]
+        img = np.concatenate((img, edge_profile), axis=2)
+
+        cv2.imshow("image", img)
+        cv2.waitKey(0)
+        datasets = []
+        print("Generating image datasets...")
+        for trans, adv in [(False, False)]:
+            new_images = predraw_shadows_and_edges(
+                test_images, new_labels, use_adv=adv, use_transform=trans
+            )
+            datasets.append(AndrewNetDataset(new_images, new_labels))
+        dataset_test = ConcatDataset(datasets)
+        dataloader_test = DataLoader(dataset_test, batch_size=64, shuffle=True)
+
+        print("******** I'm testing the AndrewNet Model Now! *****")
+        with torch.no_grad():
+            acc = 0.0
+
+            for data_batch in dataloader_test:
+                train_predict = model(data_batch[0].to(device))
+                acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
+
+        print(
+            f"Noisy Test Acc: {round(float(acc / len(dataset_test)), 4)}",
+            end=" ",
+        )
+        results = {
+            "Noisy Test Acc": round(float(acc / len(dataset_test)), 4),
+            "Dataset Size": len(dataset_test),
+            "Batch Size": 64,
+        }
+        with open(
+            f"./testing_results/results_B_{files[-2][6:len(files[-2]) - 4]}.json", "w"
+        ) as f:
+            json.dump(results, f)
 
 
 def main():
