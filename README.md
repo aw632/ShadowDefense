@@ -6,7 +6,8 @@ Please see our paper [HERE] for more details.
 
 Each author's defense is in a folder in the format `{author_name}Net`, and instructions for running each defense can be found in `{author_name}Net/instructions.md`. 
 
-Requires: `git-lfs`.
+Note that a number of files are stored with `git-lfs`, so you should first install `git lfs` and then enter `git lfs install` into
+the root directory of this repository.
 
 ## Directory Overview
 

@@ -5,14 +5,9 @@ import torch
 from tqdm import trange
 
 from cnn_networks import AndrewNetCNN
-from shadow_utils import (
-    SmoothCrossEntropyLoss,
-    brightness,
-    judge_mask_type,
-    load_mask,
-)
 from shadow_attack import attack
-from utils import predraw_shadows_and_edges, auto_canny
+from shadow_utils import SmoothCrossEntropyLoss, brightness, judge_mask_type, load_mask
+from utils import auto_canny, predraw_shadows_and_edges
 
 LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
 POSITION_LIST, MASK_LIST = load_mask()

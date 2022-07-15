@@ -1,4 +1,7 @@
+import pickle
+
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn as nn
 from torchvision import transforms
@@ -140,3 +143,38 @@ def weights_init(m):
     if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
         nn.init.trunc_normal_(m.weight, std=0.05)
         nn.init.constant_(m.bias, 0.05)
+
+
+def main():
+    # load the train and test data
+    with open("dataset/GTSRB/train.pkl", "rb") as f:
+        train_data = pickle.load(f)
+        _, train_labels = train_data["data"], train_data["labels"]
+
+    with open("dataset/GTSRB/test.pkl", "rb") as f:
+        test_data = pickle.load(f)
+        _, test_labels = test_data["data"], test_data["labels"]
+
+    # plot a histogram of the train labels
+    counts, edges, bars = plt.hist(
+        train_labels, bins=np.arange(0, 43, 1), edgecolor="black"
+    )
+    plt.ylabel("Frequency")
+    plt.xlabel("Classes")
+    plt.title("Histogram of GTSRB train labels")
+    # plt.bar_label(bars)
+    plt.show()
+
+    # plot a histogram of the test labels
+    counts, edges, bars = plt.hist(
+        test_labels, bins=np.arange(0, 43, 1), edgecolor="black"
+    )
+    plt.ylabel("Frequency")
+    plt.xlabel("Classes")
+    plt.title("Histogram of GTSRB test labels")
+    # plt.bar_label(bars)
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()

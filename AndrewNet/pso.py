@@ -7,6 +7,7 @@ import numpy as np
 import torch
 from torchvision import transforms
 from torchvision.transforms import Compose
+
 from shadow_utils import (
     draw_shadow,
     image_transformation,

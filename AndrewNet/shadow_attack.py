@@ -1,5 +1,6 @@
-from pso import PSO
 from torchvision import transforms
+
+from pso import PSO
 from shadow_utils import pre_process_image
 
 
