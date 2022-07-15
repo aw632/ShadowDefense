@@ -122,9 +122,11 @@ def test_regime_b(testing_dataset, device, filename=None):
     )
     results = {
         "Benign Test Acc": round(float(acc / len(dataset_test)), 4),
+        "Dataset Size" : len(dataset_test),
+        "Batch Size" : 64,
     }
     with open(
-        f"./testing_results/results_B_{files[-2][6:len(files[-2]) - 4]}.json", "wb"
+        f"./testing_results/results_B_{files[-2][6:len(files[-2]) - 4]}.json", "w"
     ) as f:
         json.dump(results, f)
 
