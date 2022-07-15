@@ -127,7 +127,7 @@ def main():
     )
     parser.add_argument(
         "-p",
-        "--proportion_of_test",
+        "--proportion",
         type=float,
         default=1.0,
         help="Fraction of test data to use for testing.",
@@ -137,7 +137,9 @@ def main():
         case "TRAIN":
             train_model(args)
         case "TEST_A":
-            test.test_regime_a(args.test_dataset_location, DEVICE, args.model_to_test)
+            test.test_regime_a(
+                args.test_dataset_location, DEVICE, args.proportion, args.model_to_test
+            )
         case "TEST_B":
             test.test_regime_b(args.test_dataset_location, DEVICE, args.model_to_test)
         case "TEST_C":
@@ -145,6 +147,7 @@ def main():
                 args.train_dataset_location,
                 args.test_dataset_location,
                 DEVICE,
+                args.proportion,
                 args.model_to_test,
             )
 
