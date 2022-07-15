@@ -16,17 +16,16 @@ from utils import shadow_edge_blur
 from utils import judge_mask_type
 from utils import load_mask
 
-with open('params.json', 'r') as config:
+with open("params.json", "r") as config:
     params = json.load(config)
-    class_n = params['GTSRB']['class_n']
-    device = params['device']
+    class_n = params["GTSRB"]["class_n"]
+    device = params["device"]
     position_list, _ = load_mask()
 
 loss_fun = SmoothCrossEntropyLoss(smoothing=0.1)
 
 
 class TrafficSignDataset(torch.utils.data.Dataset):
-
     def __init__(self, x, y):
         self.x = x
         self.y = torch.LongTensor(y)
@@ -41,7 +40,6 @@ class TrafficSignDataset(torch.utils.data.Dataset):
 
 
 class GtsrbCNN(nn.Module):
-
     def __init__(self, n_class):
 
         super().__init__()
@@ -71,9 +69,7 @@ class GtsrbCNN(nn.Module):
             nn.Dropout(p=0.5),
         )
         self.fc1 = nn.Sequential(
-            nn.Linear(14336, 1024, bias=True),
-            nn.ReLU(),
-            nn.Dropout(p=0.5)
+            nn.Linear(14336, 1024, bias=True), nn.ReLU(), nn.Dropout(p=0.5)
         )
         self.fc2 = nn.Sequential(
             nn.Linear(1024, 1024, bias=True),
@@ -105,7 +101,7 @@ def pre_process_image(image):
     image[:, :, 0] = cv2.equalizeHist(image[:, :, 0])
     image[:, :, 1] = cv2.equalizeHist(image[:, :, 1])
     image[:, :, 2] = cv2.equalizeHist(image[:, :, 2])
-    image = image / 255. - .5
+    image = image / 255.0 - 0.5
     return image
 
 
@@ -140,16 +136,24 @@ def transform_image(image, ang_range, shear_range, trans_range, preprocess):
     return image
 
 
-def gen_extra_data(x_train, y_train, n_each, ang_range,
-                   shear_range, trans_range, randomize_var, preprocess=True):
+def gen_extra_data(
+    x_train,
+    y_train,
+    n_each,
+    ang_range,
+    shear_range,
+    trans_range,
+    randomize_var,
+    preprocess=True,
+):
 
     x_arr, y_arr = [], []
     n_train = len(x_train)
     for i in range(n_train):
         for i_n in range(n_each):
-            img_trf = transform_image(x_train[i],
-                                      ang_range, shear_range, trans_range,
-                                      preprocess)
+            img_trf = transform_image(
+                x_train[i], ang_range, shear_range, trans_range, preprocess
+            )
             x_arr.append(img_trf)
             y_arr.append(y_train[i])
 
@@ -189,16 +193,22 @@ def model_epoch(training_model, data_loader, train=False, optimizer=None):
     return acc, loss
 
 
-def training(training_model, train_data, train_labels, test_data, test_labels, adv_train=False):
+def training(
+    training_model, train_data, train_labels, test_data, test_labels, adv_train=False
+):
 
     num_epoch, batch_size = 25, 64
     optimizer = torch.optim.Adam(
-        training_model.parameters(), lr=0.001, weight_decay=1e-5)
+        training_model.parameters(), lr=0.001, weight_decay=1e-5
+    )
 
     for epoch in range(num_epoch):
 
-        extra_train, extra_labels = adversarial_augmentation(
-            train_data, train_labels) if adv_train else (train_data, train_labels)
+        extra_train, extra_labels = (
+            adversarial_augmentation(train_data, train_labels)
+            if adv_train
+            else (train_data, train_labels)
+        )
 
         train_set = TrafficSignDataset(extra_train, extra_labels)
         test_set = TrafficSignDataset(test_data, test_labels)
@@ -209,23 +219,29 @@ def training(training_model, train_data, train_labels, test_data, test_labels, a
 
         training_model.train()
         train_acc, train_loss = model_epoch(
-            training_model, train_loader, train=True, optimizer=optimizer)
+            training_model, train_loader, train=True, optimizer=optimizer
+        )
 
         training_model.eval()
         with torch.no_grad():
             test_acc, test_loss = model_epoch(training_model, test_loader)
 
-        print(f'[{epoch+1}/{num_epoch}] {round(time.time() - epoch_start_time, 2)}', end=' ')
-        print(f'Train Acc: {round(float(train_acc / train_set.__len__()), 4)}', end=' ')
-        print(f'Loss: {round(float(train_loss / train_set.__len__()), 4)}', end=' | ')
-        print(f'Test Acc: {round(float(test_acc / test_set.__len__()), 4)}', end=' ')
-        print(f'Loss: {round(float(test_loss / test_set.__len__()), 4)}')
+        print(
+            f"[{epoch+1}/{num_epoch}] {round(time.time() - epoch_start_time, 2)}",
+            end=" ",
+        )
+        print(f"Train Acc: {round(float(train_acc / train_set.__len__()), 4)}", end=" ")
+        print(f"Loss: {round(float(train_loss / train_set.__len__()), 4)}", end=" | ")
+        print(f"Test Acc: {round(float(test_acc / test_set.__len__()), 4)}", end=" ")
+        print(f"Loss: {round(float(test_loss / test_set.__len__()), 4)}")
 
         del extra_train, extra_labels, train_set, train_loader
         gc.collect()
 
-    torch.save(training_model.state_dict(),
-               f'./model/{"adv_" if adv_train else ""}model_gtsrb.pth')
+    torch.save(
+        training_model.state_dict(),
+        f'./model/{"adv_" if adv_train else ""}model_gtsrb.pth',
+    )
 
 
 def adversarial_augmentation(ori_data_train, ori_labels_train):
@@ -239,7 +255,11 @@ def adversarial_augmentation(ori_data_train, ori_labels_train):
     for i in range(0, num_data * 2, 2):
         pos_list = position_list[judge_mask_type("GTSRB", labels_train[i])]
         shadow_image, shadow_area = draw_shadow(
-            np.random.uniform(-16, 48, 6), data_train[i], pos_list, np.random.uniform(0.2, 0.7))
+            np.random.uniform(-16, 48, 6),
+            data_train[i],
+            pos_list,
+            np.random.uniform(0.2, 0.7),
+        )
         data_train[i + 1] = shadow_edge_blur(shadow_image, shadow_area, 3)
 
     data_train = data_train.astype(np.float32)
@@ -251,21 +271,28 @@ def adversarial_augmentation(ori_data_train, ori_labels_train):
 
 def train_model(adv_train=False):
 
-    with open('./dataset/GTSRB/train.pkl', 'rb') as f:
+    with open("./dataset/GTSRB/train.pkl", "rb") as f:
         train = pickle.load(f)
-        train_data, train_labels = train['data'], train['labels']
-    with open('./dataset/GTSRB/test.pkl', 'rb') as f:
+        train_data, train_labels = train["data"], train["labels"]
+    with open("./dataset/GTSRB/test.pkl", "rb") as f:
         test = pickle.load(f)
-        test_data, test_labels = test['data'], test['labels']
+        test_data, test_labels = test["data"], test["labels"]
 
-    processed_train = np.array([
-        pre_process_image(train_data[i]) for i in range(len(train_data))],
-        dtype=np.float32) if not adv_train else train_data
-    processed_test = np.array([
-        pre_process_image(test_data[i]) for i in range(len(test_data))],
-        dtype=np.float32)
+    processed_train = (
+        np.array(
+            [pre_process_image(train_data[i]) for i in range(len(train_data))],
+            dtype=np.float32,
+        )
+        if not adv_train
+        else train_data
+    )
+    processed_test = np.array(
+        [pre_process_image(test_data[i]) for i in range(len(test_data))],
+        dtype=np.float32,
+    )
     augment_data_train, augment_data_labels = gen_extra_data(
-        train_data, train_labels, 10, 30, 5, 5, 1, preprocess=not adv_train)
+        train_data, train_labels, 10, 30, 5, 5, 1, preprocess=not adv_train
+    )
 
     image_train = np.concatenate([processed_train, augment_data_train], 0)
     label_train = np.concatenate([train_labels, augment_data_labels], 0)
@@ -279,16 +306,20 @@ def test_model(adv_model=False):
 
     trained_model = GtsrbCNN(n_class=class_n).to(device)
     trained_model.load_state_dict(
-        torch.load(f'./model/{"adv_" if adv_model else ""}model_gtsrb.pth',
-                   map_location=torch.device(device)))
+        torch.load(
+            f'./model/{"adv_" if adv_model else ""}model_gtsrb.pth',
+            map_location=torch.device(device),
+        )
+    )
 
-    with open('./dataset/GTSRB/test.pkl', 'rb') as f:
+    with open("./dataset/GTSRB/test.pkl", "rb") as f:
         test = pickle.load(f)
-        test_data, test_labels = test['data'], test['labels']
+        test_data, test_labels = test["data"], test["labels"]
 
-    test_data = np.array([
-        pre_process_image(test_data[i]) for i in range(len(test_data))],
-        dtype=np.float32)
+    test_data = np.array(
+        [pre_process_image(test_data[i]) for i in range(len(test_data))],
+        dtype=np.float32,
+    )
 
     test_set = TrafficSignDataset(test_data, test_labels)
     test_loader = DataLoader(test_set, batch_size=64, shuffle=False)
@@ -297,15 +328,18 @@ def test_model(adv_model=False):
     with torch.no_grad():
         test_acc, _ = model_epoch(trained_model, test_loader)
 
-    print(f'Test Acc: {round(float(test_acc / test_set.__len__()), 4)}')
+    print(f"Test Acc: {round(float(test_acc / test_set.__len__()), 4)}")
 
 
 def test_single_image(img_path, label, adv_model=False):
 
     trained_model = GtsrbCNN(n_class=class_n).to(device)
     trained_model.load_state_dict(
-        torch.load(f'./model/{"adv_" if adv_model else ""}model_gtsrb.pth',
-                   map_location=torch.device(device)))
+        torch.load(
+            f'./model/{"adv_" if adv_model else ""}model_gtsrb.pth',
+            map_location=torch.device(device),
+        )
+    )
     trained_model.eval()
 
     img = cv2.imread(img_path)
@@ -318,13 +352,13 @@ def test_single_image(img_path, label, adv_model=False):
     index = int(torch.argmax(predict).data)
     confidence = float(predict[index].data)
 
-    print(f'Correct: {index==label}', end=' ')
-    print(f'Predict: {index} Confidence: {confidence*100}%')
+    print(f"Correct: {index==label}", end=" ")
+    print(f"Predict: {index} Confidence: {confidence*100}%")
 
     return index, index == label
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     # model training
     # train_model(adv_train=False)
@@ -333,4 +367,4 @@ if __name__ == '__main__':
     # test_model(adv_model=False)
 
     # test a single image
-    test_single_image('./tmp/adv_img.png', 1, adv_model=False)
+    test_single_image("./tmp/adv_img.png", 1, adv_model=False)
