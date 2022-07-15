@@ -155,7 +155,8 @@ def main():
         case "TRAIN":
             train_model(args)
         case "TEST_A":
-            for _ in tqdm(range(args.repeat_test)):
+            for i in range(args.repeat_test):
+                print(f"Test A: Iteration {i}")
                 test.test_regime_a(
                     args.test_dataset_location,
                     DEVICE,
