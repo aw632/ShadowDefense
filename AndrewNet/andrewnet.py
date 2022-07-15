@@ -132,25 +132,17 @@ def main():
         default=1.0,
         help="Fraction of test data to use for testing.",
     )
-    parser.add_argument(
-        "-r" "--repeat_test",
-        type=int,
-        default=1,
-        help="Number of times to repeat the test.",
-    )
     args = parser.parse_args()
     match args.regime:
         case "TRAIN":
             train_model(args)
         case "TEST_A":
-            for i in range(args.repeat_test):
-                print(f"Test A: Iteration {i}")
-                test.test_regime_a(
-                    args.test_dataset_location,
-                    DEVICE,
-                    args.proportion,
-                    args.model_to_test,
-                )
+            test.test_regime_a(
+                args.test_dataset_location,
+                DEVICE,
+                args.proportion,
+                args.model_to_test,
+            )
         case "TEST_B":
             test.test_regime_b(args.test_dataset_location, DEVICE, args.model_to_test)
         case "TEST_C1":
