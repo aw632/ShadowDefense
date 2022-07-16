@@ -1,4 +1,4 @@
-# Adversarial Sign Detection: Shadow Attack and Defenses
+# Shadows Aren’t So Dangerous: A Speedy and Robust Defense Against Shadow-Based Adversarial Attacks
 
 This repository holds the code for our paper [PAPER-NAME] by Andrew Wang, Gopal Nookula, Wyatt Mayor and Ryan Smith.
 The defenses are based off the adversarial attacks against road sign recognition models in [THIS PAPER] by Zhong et. al (2022). Our defenses achieve 84% robustness with a simple edge profile channel retrained on the paper's original CNN.
