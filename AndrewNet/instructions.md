@@ -4,17 +4,17 @@ This document provides instructions and documentation regarding training and tes
 
 The primary entry point is `andrewnet.py`. For the purposes of this document, we assume you are currently in `./AndrewNet/` and all commands are being entered from there.
 
-```sh
+```
 usage: andrewnet.py [-h] [-d DATA_FRACTION] [-train_l TRAIN_DATASET_LOCATION]
                     [-test_l TEST_DATASET_LOCATION] [-m MODEL_TO_TEST]
-                    {TRAIN,TEST_A,TEST_B}
+                    [-p PROPORTION]
+                    {TRAIN,TEST_A,TEST_B,TEST_C1,TEST_C2}
 
 Entry point into the ANet Model.
 
 positional arguments:
-  {TRAIN,TEST_A,TEST_B,TEST_C}
-                        Regime to train the model on. Must be one of TRAIN,
-                        TEST_A, TEST_B, TEST_C.
+  {TRAIN,TEST_A,TEST_B,TEST_C1,TEST_C2}
+                        Regime to train the model on.
 
 options:
   -h, --help            show this help message and exit
@@ -30,7 +30,20 @@ options:
                         Location of the model to test. Requires: model is
                         .pth. If None, then use the most recent model in
                         ./checkpoints.
+  -p PROPORTION, --proportion PROPORTION
+                        Fraction of test data to use for testing.
 ```
+
+## Environment Setup
+
+The code was originally written in an Anaconda environment. The command
+
+
+```sh
+conda create --name my_name --file requirements.txt
+```
+
+can be used to setup a Conda virtual environment with the name `my_name` with the required dependencies.
 
 ## Checkpoint
 
@@ -56,11 +69,15 @@ Each of the lettered regimes test the model using the provided testing dataset, 
 
 **Regime TEST_C** tests the model on adversarial images from the test set, with added Gaussian noise $\mu = 0, \sigma = \frac{\sigma_{\text{train}}}{2}$, where $\sigma_{\text{train}}$ is the standard deviation of all pixels in all channels in the training set.
 
+### Repeated Testing
+
+An editable `test.sh` file is provided to train and test the same regime multiple times in order to get a sample of possible results. It can be called with `bash test.sh`. Ensure that it has permissions to execute with `chmod u+x test.sh`. 
+
 ## Results
 
 If you are using Regime TRAIN, then results are saved into `./checkpoints` with the time that training was finished.
 
-The file `zresults.pkl` contains a dictionary `results` with the filenames of models as keys and their accuracies as values. Confidence bars on the accuracy can be calculated from here.
+The file `zresults.json` contains a dictionary with the filenames of models as keys and their training accuracies as values. Confidence bars on the accuracy can be calculated from here.
 
 If you are using one of the testing regimes, then a `.json` file containing statistics will be saved into `./testing_results`.
 

@@ -2,6 +2,7 @@ import argparse
 import pickle
 import test
 from datetime import datetime
+import json
 
 import numpy as np
 import torch
@@ -14,7 +15,7 @@ from shadow_utils import SmoothCrossEntropyLoss
 from utils import predraw_shadows_and_edges, weights_init
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-ANET_MODEL = "./checkpoints/model"
+ANET_MODEL = "./checkpoints/"
 LOSS_FUN = SmoothCrossEntropyLoss(smoothing=0.1)
 
 
@@ -53,6 +54,7 @@ def train_model(args):
     num_epoch = 25
     training_model = AndrewNetCNN().to(DEVICE).apply(weights_init)
 
+    overall_acc = 0
     # use momentum optimiezer
     optimizer = torch.optim.Adam(
         training_model.parameters(), lr=0.001, weight_decay=1e-5
@@ -72,20 +74,31 @@ def train_model(args):
             acc += (torch.argmax(train_predict.cpu(), dim=1) == data_batch[1]).sum()
             loss += batch_loss.item() * len(data_batch[1])
             num_sample += len(data_batch[0])
+
+        epoch_acc = round(float(acc / real_num), 4)
         print(
-            f"Train Acc: {round(float(acc / real_num), 4)}",
+            f"Train Acc: {epoch_acc}",
             end=" ",
         )
         print(f"Loss: {round(float(loss / real_num), 4)}", end="\n")
+        overall_acc += epoch_acc
 
-    filename = (
-        f"{ANET_MODEL}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{num_epoch}.pth"
+    remainder_of_file_name = (
+        f"model_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}_{num_epoch}.pth"
     )
+    filename = f"{ANET_MODEL}{remainder_of_file_name}"
     torch.save(
         training_model.state_dict(),
         filename,
     )
     print(f"Model saved to {filename}!")
+    avg_acc = overall_acc / num_epoch
+    with open("./checkpoints/zresults.json", "r") as f:
+        results = json.load(f)
+
+    results["remainder_of_file_name"] = str(avg_acc)
+    with open("./checkpoints/zresults.json", "w") as f:
+        json.dump(results, f)
 
 
 def main():
