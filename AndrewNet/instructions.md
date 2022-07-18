@@ -49,6 +49,10 @@ can be used to setup a Conda virtual environment with the name `my_name` with th
 
 We provide a checkpoint model in `./checkpoints/sample_model.pth` that we trained on the GTSRB training set. The training parameters, such as learning rate, can be found in `andrew_net.train_model` and model architecture can be found in `andrewnet.py`. The sample model is the same model found in the paper results. 
 
+## Dataset
+
+Placeholder text.
+
 ## Training and Testing
 
 There are four regimes currently available to access.
@@ -81,3 +85,14 @@ The file `zresults.json` contains a dictionary with the filenames of models as k
 
 If you are using one of the testing regimes, then a `.json` file containing statistics will be saved into `./testing_results`.
 
+## Saliency
+
+Saliency code is provided for completeness. Please note that this code is "quick and dirty" code intended to make images for the paper. Therefore, the quality of this code is not up to par with the rest of the code.
+
+## Attributions
+
+A number of files and functions in this paper are copies or reproductions of other's work. We give them attribution here.
+
+`shadow_attack.py` and `shadow_utils.py`, as well as some functions in `utils.py` are adapted from Zhong et al. (2022), https://arxiv.org/abs/2203.03818.
+
+`misc_functions.py`, `vanilla_backprop.py`, and portions of the code in `saliency.py` are adapted or reused from https://github.com/utkuozbulak/pytorch-cnn-visualizations. 

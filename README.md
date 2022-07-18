@@ -18,3 +18,7 @@ Setup instructions can be found in `./AndrewNet/instructions.md`.
 ## Directory Overview
 
 The
+
+## Attributions
+
+Please see `./AndrewNet/instructions.md` for attributions to others' work.
