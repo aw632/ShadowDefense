@@ -32,10 +32,10 @@ def grad_times_saliency():
 
 
 if __name__ == "__main__":
-    rand_int = np.random.randint(0, 39000)
     # with open("dataset/GTSRB/train.pkl", "rb") as f:
     #     train_data = pickle.load(f)
     #     train_images, train_labels = train_data["data"], train_data["labels"]
+    # rand_int = np.random.randint(0, len(train_images))
     # img, label = train_images[rand_int], train_labels[rand_int]
     # mask_type = judge_mask_type("GTSRB", label)
     # # if brightness(img, MASK_LIST[mask_type]) >= 120:
