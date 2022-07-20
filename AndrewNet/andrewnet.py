@@ -96,7 +96,7 @@ def train_model(args):
     with open("./checkpoints/zresults.json", "r") as f:
         results = json.load(f)
 
-    results["remainder_of_file_name"] = str(avg_acc)
+    results[remainder_of_file_name] = str(avg_acc)
     with open("./checkpoints/zresults.json", "w") as f:
         json.dump(results, f)
 
