@@ -3,6 +3,7 @@ import pickle
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
 import torch.nn as nn
 from torchvision import transforms
 from tqdm import tqdm
@@ -100,6 +101,7 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform, make_tenso
         list: a list of ndarray with dtype=float64 representing images.
     """
     new_images = []
+    # for idx in range(1):
     for idx in tqdm(range(len(images))):
         img, label = images[idx], labels[idx]
         if use_adv:  # if use_adv is True, then make adversarial images
@@ -115,11 +117,19 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform, make_tenso
             img = shadow_edge_blur(shadow_image, shadow_area, 3)
         # always add edge profile
         # FOR DEBUGGING
-        # cv2.imwrite(f"./testing/test_data/input/{idx}_original.png", img)
-        blur = cv2.GaussianBlur(img, (3, 3), 0)
-        edge_profile = auto_canny(blur.copy().astype(np.uint8))
+        # cv2.imwrite(f"{idx}_original.png", img)
+
+        other_img = img.copy()
+        blur = cv2.cvtColor(other_img, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(blur, (3, 3), 0)
+        blur = cv2.adaptiveThreshold(
+            blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 3, 1
+        )
+        # cv2.imwrite(f"{idx}blur.png", blur)
+        # edge_profile = auto_canny(blur.astype(np.uint8))
+        edge_profile = blur.astype(np.uint8)
         # # DEBUGGING
-        # # cv2.imwrite(f"./testing/test_data/output/{idx}_edge.png", edge_profile)
+        # cv2.imwrite(f"{idx}_edge.png", edge_profile)
         edge_profile = edge_profile[..., np.newaxis]
         img = np.concatenate((img, edge_profile), axis=2)
         if use_transform:
@@ -151,32 +161,34 @@ def main():
     # load the train and test data
     with open("dataset/GTSRB/train.pkl", "rb") as f:
         train_data = pickle.load(f)
-        _, train_labels = train_data["data"], train_data["labels"]
+        train_images, train_labels = train_data["data"], train_data["labels"]
 
-    with open("dataset/GTSRB/test.pkl", "rb") as f:
-        test_data = pickle.load(f)
-        _, test_labels = test_data["data"], test_data["labels"]
+    # with open("dataset/GTSRB/test.pkl", "rb") as f:
+    #     test_data = pickle.load(f)
+    #     _, test_labels = test_data["data"], test_data["labels"]
 
-    # plot a histogram of the train labels
-    counts, edges, bars = plt.hist(
-        train_labels, bins=np.arange(0, 43, 1), edgecolor="black"
-    )
-    plt.ylabel("Frequency")
-    plt.xlabel("Classes")
-    plt.title("Histogram of GTSRB train labels")
-    # plt.bar_label(bars)
-    plt.show()
+    train_labels = torch.LongTensor(train_labels)
+    x = predraw_shadows_and_edges(train_images, train_labels, True, True)
+    # # plot a histogram of the train labels
+    # counts, edges, bars = plt.hist(
+    #     train_labels, bins=np.arange(0, 43, 1), edgecolor="black"
+    # )
+    # plt.ylabel("Frequency")
+    # plt.xlabel("Classes")
+    # plt.title("Histogram of GTSRB train labels")
+    # # plt.bar_label(bars)
+    # plt.show()
 
-    # plot a histogram of the test labels
-    counts, edges, bars = plt.hist(
-        test_labels, bins=np.arange(0, 43, 1), edgecolor="black"
-    )
-    plt.ylabel("Frequency")
-    plt.xlabel("Classes")
-    plt.title("Histogram of GTSRB test labels")
-    # plt.bar_label(bars)
-    plt.show()
+    # # plot a histogram of the test labels
+    # counts, edges, bars = plt.hist(
+    #     test_labels, bins=np.arange(0, 43, 1), edgecolor="black"
+    # )
+    # plt.ylabel("Frequency")
+    # plt.xlabel("Classes")
+    # plt.title("Histogram of GTSRB test labels")
+    # # plt.bar_label(bars)
+    # plt.show()
 
 
-if __name__ == "main":
+if __name__ == "__main__":
     main()
