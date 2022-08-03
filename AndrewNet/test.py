@@ -55,7 +55,7 @@ def prep_regimes(testing_dataset, device, filename=None):
     return files, filename, images, labels, model
 
 
-def test_regime_a(testing_dataset, device, proportion, filename=None):
+def test_regime_a(testing_dataset, device, proportion, shadow=0.43, filename=None):
     """See instructions.md for details on Test Regime A.
 
     Requires: testing_dataset is saved as a .pkl file with an iterable of [images]
@@ -81,7 +81,7 @@ def test_regime_a(testing_dataset, device, proportion, filename=None):
         mask_type = judge_mask_type("GTSRB", labels[index])
         if brightness(images[index], MASK_LIST[mask_type]) >= 120:
             success, num_query = attack(
-                images[index], labels[index], POSITION_LIST[mask_type], our_model=model
+                images[index], labels[index], POSITION_LIST[mask_type], shadow=shadow, our_model=model
             )
             num_successes += success
             total_num_query += num_query

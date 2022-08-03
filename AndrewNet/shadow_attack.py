@@ -9,6 +9,7 @@ def attack(
     label,
     coords,
     our_model,
+    shadow=0.43,
     targeted_attack=False,
     physical_attack=False,
     testing=False,
@@ -50,7 +51,7 @@ def attack(
         iter_num = 100
         x_min, x_max = -16, 48
         max_speed = 1.5
-        shadow_level = 0.43
+        shadow_level = shadow
         pre_process = transforms.Compose([pre_process_image, transforms.ToTensor()])
         pso = PSO(
             polygon * 2,

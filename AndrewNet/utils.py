@@ -119,15 +119,15 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform, make_tenso
         # FOR DEBUGGING
         # cv2.imwrite(f"{idx}_original.png", img)
 
-        other_img = img.copy()
-        blur = cv2.cvtColor(other_img, cv2.COLOR_BGR2GRAY)
-        blur = cv2.GaussianBlur(blur, (3, 3), 0)
-        blur = cv2.adaptiveThreshold(
-            blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 3, 1
-        )
+        # other_img = img.copy()
+        # blur = cv2.cvtColor(other_img, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(img, (3, 3), 0)
+        # blur = cv2.adaptiveThreshold(
+        #     blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 3, 1
+        # )
         # cv2.imwrite(f"{idx}blur.png", blur)
-        # edge_profile = auto_canny(blur.astype(np.uint8))
-        edge_profile = blur.astype(np.uint8)
+        edge_profile = auto_canny(blur.copy().astype(np.uint8))
+        # edge_profile = blur.astype(np.uint8)
         # # DEBUGGING
         # cv2.imwrite(f"{idx}_edge.png", edge_profile)
         edge_profile = edge_profile[..., np.newaxis]
@@ -137,7 +137,7 @@ def predraw_shadows_and_edges(images, labels, use_adv, use_transform, make_tenso
             img = transform_img(
                 image=img,
                 ang_range=30,
-                shear_range=5,
+                shear_range=5,  
                 trans_range=5,
                 preprocess=not use_adv,
             )

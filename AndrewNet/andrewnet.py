@@ -145,6 +145,13 @@ def main():
         default=1.0,
         help="Fraction of test data to use for testing.",
     )
+    parser.add_argument(
+        "-s",
+        "--shadow",
+        type=float,
+        default=0.43,
+        help="Shadow level.",
+    )
     args = parser.parse_args()
     match args.regime:
         case "TRAIN":
@@ -154,6 +161,7 @@ def main():
                 args.test_dataset_location,
                 DEVICE,
                 args.proportion,
+                args.shadow,
                 args.model_to_test,
             )
         case "TEST_B":
